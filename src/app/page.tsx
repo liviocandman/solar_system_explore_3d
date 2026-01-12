@@ -1,65 +1,115 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import { Toaster, toast } from 'sonner';
+import type { EphemerisData, EphemerisResponse } from '@/lib/types';
+
+// Dynamically import SceneManager with SSR disabled
+// This prevents hydration mismatch errors with Three.js/R3F
+const SceneManager = dynamic(
+  () => import('@/components/three/SceneManager').then(mod => mod.SceneManager),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)',
+        color: '#fff',
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        Loading Solar System...
+      </div>
+    )
+  }
+);
+
+
+
+async function fetchEphemerisData(): Promise<EphemerisResponse> {
+  const response = await fetch('/api/ephemeris');
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// --- Component ---
 
 export default function Home() {
+  const [ephemerisData, setEphemerisData] = useState<EphemerisData[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadEphemeris() {
+      try {
+        const response = await fetchEphemerisData();
+
+        if (!mounted) return;
+
+        setEphemerisData(response.data);
+
+        // Show toast notification based on data source
+        if (response.meta.source === 'FALLBACK_DATASET') {
+          toast.warning('Modo Offline: Posições aproximadas', {
+            description: 'Usando dados de fallback. API NASA indisponível.',
+            duration: 5000,
+          });
+        } else if (response.meta.source === 'CACHE_HIT') {
+          toast.success('Dados carregados do cache', {
+            duration: 2000,
+          });
+        } else if (response.meta.source === 'NASA_LIVE') {
+          toast.success('Dados ao vivo da NASA', {
+            duration: 2000,
+          });
+        }
+
+        console.log(`[Home] Ephemeris loaded - Source: ${response.meta.source}, Bodies: ${response.data.length}`);
+
+      } catch (error) {
+        console.error('[Home] Failed to load ephemeris:', error);
+
+        if (!mounted) return;
+
+        toast.error('Erro ao carregar dados', {
+          description: 'Não foi possível carregar posições dos planetas.',
+        });
+      }
+    }
+
+    loadEphemeris();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <Toaster
+        position="top-right"
+        richColors
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      />
+      <SceneManager ephemerisData={ephemerisData} />
+    </>
   );
 }

@@ -1,0 +1,88 @@
+{
+  "description": "Fallback ephemeris data with approximate orbital positions. Based on mean orbital elements. Positions are in scene units (1 AU = 30 units).",
+  "source": "Mean orbital elements from NASA planetary fact sheets",
+  "generatedAt": "2026-01-12",
+  "data": [
+    {
+      "bodyId": "10",
+      "name": "Sun",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "bodyId": "199",
+      "name": "Mercury",
+      "position": {
+        "x": 11.6,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "bodyId": "299",
+      "name": "Venus",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 21.7
+      }
+    },
+    {
+      "bodyId": "399",
+      "name": "Earth",
+      "position": {
+        "x": -30,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "bodyId": "499",
+      "name": "Mars",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": -45.6
+      }
+    },
+    {
+      "bodyId": "599",
+      "name": "Jupiter",
+      "position": {
+        "x": 156,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "bodyId": "699",
+      "name": "Saturn",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 286.5
+      }
+    },
+    {
+      "bodyId": "799",
+      "name": "Uranus",
+      "position": {
+        "x": -576,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "bodyId": "899",
+      "name": "Neptune",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": -900
+      }
+    }
+  ]
+}
