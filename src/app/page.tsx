@@ -4,32 +4,18 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Toaster, toast } from 'sonner';
 import { useEphemeris } from '@/hooks/useEphemeris';
+import { useLoadingProgress } from '@/hooks/useLoadingProgress';
+import { useWebGLError } from '@/hooks/useWebGLError';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { ErrorOverlay } from '@/components/ui/ErrorOverlay';
+import type { AppError } from '@/components/ui/ErrorOverlay';
 import type { SelectedPlanet } from '@/components/three/SceneManager';
 
 // Dynamically import SceneManager with SSR disabled
 // This prevents hydration mismatch errors with Three.js/R3F
 const SceneManager = dynamic(
   () => import('@/components/three/SceneManager').then(mod => mod.SceneManager),
-  {
-    ssr: false,
-    loading: () => (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
-      }}>
-        Loading Solar System...
-      </div>
-    )
-  }
+  { ssr: false }
 );
 
 // --- Date Utilities ---
@@ -59,16 +45,37 @@ export default function Home() {
   const {
     data: ephemerisData,
     isLoading,
-    error,
+    error: ephemerisError,
     source,
     isFallback,
     retry,
+    retryCount,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     refresh // Will be used by HUD DateSelector in Task 5
   } = useEphemeris({ date: currentDate });
 
+  // WebGL error detection
+  const { error: webglError, isSupported: isWebGLSupported } = useWebGLError();
+
+  // Track loading progress
+  const loadingProgress = useLoadingProgress({
+    isApiLoading: isLoading,
+    hasApiData: ephemerisData.length > 0,
+  });
+
   // Selected planet state for HUD
   const [selectedPlanet, setSelectedPlanet] = useState<SelectedPlanet | null>(null);
+
+  // Combine errors - WebGL errors take priority
+  const activeError: AppError | null = webglError ?? (ephemerisError ? {
+    type: ephemerisError.type,
+    message: ephemerisError.message,
+    technicalDetails: ephemerisError.technicalDetails,
+    canRetry: ephemerisError.canRetry,
+  } : null);
+
+  // Only show error overlay for critical errors (not when fallback is working)
+  const showErrorOverlay = activeError && (!isFallback || !isWebGLSupported);
 
   // Handle date change with validation (will be used by HUD DateSelector in Task 5)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -109,21 +116,6 @@ export default function Home() {
     console.log(`[Home] Ephemeris loaded - Source: ${source}, Bodies: ${ephemerisData.length}, Date: ${currentDate}`);
   }, [source, isLoading, ephemerisData.length, currentDate]);
 
-  // Show error toast if there's an error (even with fallback active)
-  useEffect(() => {
-    if (error && !isLoading) {
-      toast.error('Erro ao carregar dados', {
-        description: isFallback
-          ? 'Usando dados aproximados. Clique para tentar novamente.'
-          : error.message,
-        action: error.canRetry ? {
-          label: 'Tentar novamente',
-          onClick: retry,
-        } : undefined,
-      });
-    }
-  }, [error, isLoading, isFallback, retry]);
-
   // Handle planet selection
   const handlePlanetClick = (planet: SelectedPlanet | null) => {
     setSelectedPlanet(planet);
@@ -134,6 +126,9 @@ export default function Home() {
       console.log('[Home] Planet deselected');
     }
   };
+
+  // Show loading screen while loading
+  const showLoadingScreen = loadingProgress.stage !== 'ready' && !showErrorOverlay;
 
   return (
     <>
@@ -150,15 +145,34 @@ export default function Home() {
         }}
       />
 
-      <SceneManager
-        ephemerisData={ephemerisData}
-        onPlanetClick={handlePlanetClick}
-        selectedPlanetId={selectedPlanet?.bodyId}
-        selectedPlanetPosition={selectedPlanet?.position}
-      />
+      {/* Error overlay for critical errors */}
+      {showErrorOverlay && activeError && (
+        <ErrorOverlay
+          error={activeError}
+          onRetry={retry}
+          retryCount={retryCount}
+          maxRetries={3}
+          isFallbackActive={isFallback}
+        />
+      )}
+
+      {/* Loading screen with progress */}
+      {showLoadingScreen && (
+        <LoadingScreen progress={loadingProgress} />
+      )}
+
+      {/* Scene (renders behind loading screen during load) */}
+      {isWebGLSupported && (
+        <SceneManager
+          ephemerisData={ephemerisData}
+          onPlanetClick={handlePlanetClick}
+          selectedPlanetId={selectedPlanet?.bodyId}
+          selectedPlanetPosition={selectedPlanet?.position}
+        />
+      )}
 
       {/* Selected planet info panel (will be replaced by HUD in Task 5) */}
-      {selectedPlanet && (
+      {selectedPlanet && !showLoadingScreen && !showErrorOverlay && (
         <div
           style={{
             position: 'fixed',
@@ -184,30 +198,32 @@ export default function Home() {
       )}
 
       {/* Date display (temporary - will be in HUD for Task 5) */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          padding: '12px 16px',
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          color: '#fff',
-          fontFamily: 'monospace',
-          fontSize: '0.875rem',
-          zIndex: 100,
-        }}
-      >
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', marginBottom: '4px' }}>
-          Simulation Date
+      {!showLoadingScreen && !showErrorOverlay && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            padding: '12px 16px',
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: '#fff',
+            fontFamily: 'monospace',
+            fontSize: '0.875rem',
+            zIndex: 100,
+          }}
+        >
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', marginBottom: '4px' }}>
+            Simulation Date
+          </div>
+          <div>{currentDate}</div>
         </div>
-        <div>{currentDate}</div>
-      </div>
+      )}
 
       {/* Fallback mode indicator */}
-      {isFallback && (
+      {isFallback && !showLoadingScreen && !showErrorOverlay && (
         <div
           style={{
             position: 'fixed',

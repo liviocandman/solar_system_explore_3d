@@ -4,8 +4,40 @@ import { CSSProperties } from 'react';
 
 // --- Types ---
 
+export type LoadingStage = 'initializing' | 'fetching_data' | 'loading_textures' | 'ready';
+
+export interface LoadingProgress {
+  stage: LoadingStage;
+  progress: number; // 0-100
+  texturesLoaded?: number;
+  texturesTotal?: number;
+}
+
 interface LoadingScreenProps {
   message?: string;
+  progress?: LoadingProgress;
+}
+
+// --- Stage Messages ---
+
+function getStageMessage(progress?: LoadingProgress): string {
+  if (!progress) return 'Initializing...';
+
+  switch (progress.stage) {
+    case 'initializing':
+      return 'Initializing Solar System...';
+    case 'fetching_data':
+      return 'Fetching orbital data from NASA...';
+    case 'loading_textures':
+      if (progress.texturesLoaded !== undefined && progress.texturesTotal !== undefined) {
+        return `Loading textures (${progress.texturesLoaded}/${progress.texturesTotal})`;
+      }
+      return 'Loading planet textures...';
+    case 'ready':
+      return 'Ready!';
+    default:
+      return 'Loading...';
+  }
 }
 
 // --- Styles ---
@@ -72,6 +104,28 @@ const messageStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: '0.05em',
   opacity: 0.9,
+  marginBottom: '16px',
+};
+
+const progressContainerStyle: CSSProperties = {
+  width: '200px',
+  height: '4px',
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  borderRadius: '2px',
+  overflow: 'hidden',
+  marginBottom: '8px',
+};
+
+const progressBarBaseStyle: CSSProperties = {
+  height: '100%',
+  borderRadius: '2px',
+  transition: 'width 0.3s ease-out',
+};
+
+const progressTextStyle: CSSProperties = {
+  fontSize: '0.75rem',
+  opacity: 0.6,
+  fontFamily: 'monospace',
 };
 
 const keyframesStyle = `
@@ -83,7 +137,21 @@ const keyframesStyle = `
 
 // --- Component ---
 
-export function LoadingScreen({ message = 'Loading Solar System...' }: LoadingScreenProps) {
+export function LoadingScreen({ message, progress }: LoadingScreenProps) {
+  const displayMessage = message || getStageMessage(progress);
+  const progressPercent = progress?.progress ?? 0;
+
+  // Gradient color based on progress
+  const progressBarStyle: CSSProperties = {
+    ...progressBarBaseStyle,
+    width: `${progressPercent}%`,
+    background: progressPercent < 50
+      ? 'linear-gradient(90deg, #6496ff, #8b5cf6)'
+      : progressPercent < 100
+        ? 'linear-gradient(90deg, #8b5cf6, #22c55e)'
+        : '#22c55e',
+  };
+
   return (
     <div style={containerStyle}>
       <style>{keyframesStyle}</style>
@@ -92,7 +160,17 @@ export function LoadingScreen({ message = 'Loading Solar System...' }: LoadingSc
         <div style={innerOrbitStyle} />
         <div style={planetDotStyle} />
       </div>
-      <p style={messageStyle}>{message}</p>
+      <p style={messageStyle}>{displayMessage}</p>
+
+      {/* Progress bar */}
+      <div style={progressContainerStyle}>
+        <div style={progressBarStyle} />
+      </div>
+
+      {/* Progress percentage */}
+      <span style={progressTextStyle}>
+        {progressPercent}%
+      </span>
     </div>
   );
 }
