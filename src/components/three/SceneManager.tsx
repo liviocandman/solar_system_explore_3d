@@ -1,25 +1,40 @@
 'use client';
 
-import { Suspense, ReactNode, useMemo } from 'react';
+import { Suspense, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import { QualityTierProvider, useQualityTier } from '@/contexts/QualityTierContext';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Sun } from './Sun';
-import { Earth } from './Earth';
+import { CelestialBody } from './CelestialBody';
 import type { EphemerisData } from '@/lib/types';
-import { BODY_IDS } from '@/lib/types';
+import { getPlanetConfig } from '@/lib/textureConfig';
+import { CameraController } from '@/hooks/useCameraAnimation';
 
 // --- Types ---
+
+export interface SelectedPlanet {
+  bodyId: string;
+  name: string;
+  englishName: string;
+  position: { x: number; y: number; z: number };
+  distanceFromSun: number;
+}
 
 interface SceneManagerProps {
   children?: ReactNode;
   ephemerisData?: EphemerisData[];
+  onPlanetClick?: (planet: SelectedPlanet | null) => void;
+  selectedPlanetId?: string | null;
+  selectedPlanetPosition?: { x: number; y: number; z: number } | null;
 }
 
 interface SceneContentProps {
   children?: ReactNode;
   ephemerisData?: EphemerisData[];
+  onPlanetClick?: (planet: SelectedPlanet | null) => void;
+  selectedPlanetId?: string | null;
+  selectedPlanetPosition?: { x: number; y: number; z: number } | null;
 }
 
 // --- Constants ---
@@ -31,41 +46,87 @@ const CAMERA_CONFIG = {
   far: 50000,
 };
 
-// Default positions (used when ephemeris data not available)
-const DEFAULT_EARTH_POSITION: [number, number, number] = [30, 0, 0];
+// Sun body ID (excluded from planet rendering)
+const SUN_BODY_ID = '10';
 
-// --- Helper Functions ---
 
-function getBodyPosition(
-  ephemerisData: EphemerisData[] | undefined,
-  bodyId: string,
-  defaultPosition: [number, number, number]
-): [number, number, number] {
-  if (!ephemerisData || ephemerisData.length === 0) {
-    return defaultPosition;
-  }
-
-  const body = ephemerisData.find(b => b.bodyId === bodyId);
-  if (body) {
-    return [body.position.x, body.position.y, body.position.z];
-  }
-
-  return defaultPosition;
+function calculateDistanceFromOrigin(position: [number, number, number]): number {
+  const [x, y, z] = position;
+  const sceneDistance = Math.sqrt(x * x + y * y + z * z);
+  // Convert scene units to AU (30 units = 1 AU), then to million km
+  const auDistance = sceneDistance / 30;
+  return auDistance * 149.6; // million km
 }
 
 // --- Inner Scene Component (uses quality context) ---
 
-function SceneContent({ children, ephemerisData }: SceneContentProps) {
+function SceneContent({
+  children,
+  ephemerisData,
+  onPlanetClick,
+  selectedPlanetId,
+  selectedPlanetPosition
+}: SceneContentProps) {
   const { settings, tier } = useQualityTier();
 
-  // Memoize positions to avoid recalculating on every render
-  const earthPosition = useMemo(
-    () => getBodyPosition(ephemerisData, BODY_IDS.EARTH, DEFAULT_EARTH_POSITION),
-    [ephemerisData]
-  );
+  // React 19 compiler auto-memoizes - plain computation
+  const planetsToRender = (() => {
+    if (!ephemerisData || ephemerisData.length === 0) {
+      return [];
+    }
 
+    return ephemerisData
+      .filter(body => body.bodyId !== SUN_BODY_ID) // Exclude Sun (rendered separately)
+      .map(body => {
+        const config = getPlanetConfig(body.bodyId);
+        if (!config) {
+          console.warn(`[SceneContent] No config for bodyId: ${body.bodyId}`);
+          return null;
+        }
+
+        const position: [number, number, number] = [
+          body.position.x,
+          body.position.y,
+          body.position.z,
+        ];
+
+        return {
+          bodyId: body.bodyId,
+          name: config.name,
+          englishName: config.englishName,
+          position,
+          radius: config.radius,
+          texturePath: config.texturePath,
+          rotationSpeed: config.rotationSpeed,
+          distanceFromSun: calculateDistanceFromOrigin(position),
+        };
+      })
+      .filter(Boolean);
+  })();
+
+  // Handle planet click - create SelectedPlanet and call callback
   const handlePlanetClick = (name: string) => {
-    console.log(`[Scene] Planet clicked: ${name}`);
+    if (!onPlanetClick) return;
+
+    // Find the planet by name
+    const planet = planetsToRender.find(p => p?.name === name);
+
+    if (planet) {
+      const selectedPlanet: SelectedPlanet = {
+        bodyId: planet.bodyId,
+        name: planet.name,
+        englishName: planet.englishName,
+        position: {
+          x: planet.position[0],
+          y: planet.position[1],
+          z: planet.position[2],
+        },
+        distanceFromSun: planet.distanceFromSun,
+      };
+
+      console.log(`[Scene] Planet selected: ${planet.englishName}`, selectedPlanet);
+      onPlanetClick(selectedPlanet);
+    }
   };
 
   return (
@@ -77,6 +138,12 @@ function SceneContent({ children, ephemerisData }: SceneContentProps) {
         powerPreference: tier === 'low' ? 'low-power' : 'high-performance',
       }}
       style={{ width: '100%', height: '100%' }}
+      onPointerMissed={() => {
+        // Click on empty space = deselect
+        if (onPlanetClick) {
+          onPlanetClick(null);
+        }
+      }}
     >
       {/* Ambient light for base visibility */}
       <ambientLight intensity={0.1} />
@@ -96,7 +163,7 @@ function SceneContent({ children, ephemerisData }: SceneContentProps) {
         enableDamping
         dampingFactor={0.05}
         minDistance={10}
-        maxDistance={500}
+        maxDistance={1500}
         enablePan
         panSpeed={0.5}
         rotateSpeed={0.5}
@@ -106,8 +173,27 @@ function SceneContent({ children, ephemerisData }: SceneContentProps) {
       {/* Sun at center */}
       <Sun />
 
-      {/* Earth with ephemeris position */}
-      <Earth position={earthPosition} onClick={handlePlanetClick} />
+      {/* Dynamically render all planets from ephemeris data */}
+      {planetsToRender.map((planet) => {
+        if (!planet) return null;
+
+        const isSelected = selectedPlanetId === planet.bodyId;
+
+        return (
+          <CelestialBody
+            key={planet.bodyId}
+            name={planet.name}
+            position={planet.position}
+            radius={planet.radius * (isSelected ? 1.1 : 1)} // Slight scale on selection
+            textureUrl={planet.texturePath}
+            rotationSpeed={planet.rotationSpeed}
+            onClick={handlePlanetClick}
+          />
+        );
+      })}
+
+      {/* Camera animation controller */}
+      <CameraController targetPosition={selectedPlanetPosition} />
 
       {/* Additional scene content */}
       {children}
@@ -117,7 +203,13 @@ function SceneContent({ children, ephemerisData }: SceneContentProps) {
 
 // --- Main Component ---
 
-export function SceneManager({ children, ephemerisData }: SceneManagerProps) {
+export function SceneManager({
+  children,
+  ephemerisData,
+  onPlanetClick,
+  selectedPlanetId,
+  selectedPlanetPosition
+}: SceneManagerProps) {
   return (
     <QualityTierProvider>
       <div
@@ -132,10 +224,16 @@ export function SceneManager({ children, ephemerisData }: SceneManagerProps) {
         }}
       >
         <Suspense fallback={<LoadingScreen />}>
-          <SceneContent ephemerisData={ephemerisData}>{children}</SceneContent>
+          <SceneContent
+            ephemerisData={ephemerisData}
+            onPlanetClick={onPlanetClick}
+            selectedPlanetId={selectedPlanetId}
+            selectedPlanetPosition={selectedPlanetPosition}
+          >
+            {children}
+          </SceneContent>
         </Suspense>
       </div>
     </QualityTierProvider>
   );
 }
-

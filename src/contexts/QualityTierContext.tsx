@@ -3,13 +3,12 @@
 import {
   createContext,
   useContext,
-  useMemo,
   ReactNode,
 } from 'react';
 
 // --- Types ---
 
-type QualityTier = 'high' | 'mid' | 'low';
+export type QualityTier = 'high' | 'mid' | 'low';
 
 interface QualitySettings {
   tier: QualityTier;
@@ -135,13 +134,15 @@ interface QualityTierProviderProps {
 }
 
 export function QualityTierProvider({ children }: QualityTierProviderProps) {
-  // Use useMemo for initial detection to avoid setState in effect
-  const tier = useMemo<QualityTier>(() => {
-    if (typeof window === 'undefined') return 'mid';
-    const detected = detectQualityTier();
-    console.log(`[QualityTier] Detected tier: ${detected}`);
-    return detected;
-  }, []);
+  // React 19 compiler auto-memoizes - no need for useMemo
+  // Detection runs once on mount since detectQualityTier is pure
+  const tier: QualityTier = typeof window === 'undefined'
+    ? 'mid'
+    : detectQualityTier();
+
+  if (typeof window !== 'undefined') {
+    console.log(`[QualityTier] Detected tier: ${tier}`);
+  }
 
   const contextValue: QualityTierContextValue = {
     tier,
