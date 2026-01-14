@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect } from 'react';
 import { PlanetInfo } from './PlanetInfo';
 import { DateSelector } from './DateSelector';
 
@@ -41,99 +41,22 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
-// --- Styles ---
+// --- Helpers ---
 
-// Desktop sidebar styles
-const sidebarStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  right: 0,
-  width: '320px',
-  height: '100vh',
-  background: 'rgba(0, 0, 0, 0.7)',
-  backdropFilter: 'blur(20px)',
-  borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
-  color: '#fff',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  zIndex: 100,
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-};
-
-// Mobile bottom sheet styles
-const bottomSheetBaseStyle: CSSProperties = {
-  position: 'fixed',
-  bottom: 0,
-  left: 0,
-  right: 0,
-  background: 'rgba(0, 0, 0, 0.85)',
-  backdropFilter: 'blur(20px)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '16px 16px 0 0',
-  color: '#fff',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  zIndex: 100,
-  transition: 'height 0.3s ease-out',
-  overflow: 'hidden',
-};
-
-const headerStyle: CSSProperties = {
-  padding: '16px 20px',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
-
-const titleStyle: CSSProperties = {
-  fontSize: '0.875rem',
-  fontWeight: 600,
-  color: 'rgba(255, 255, 255, 0.8)',
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
-  margin: 0,
-};
-
-const contentStyle: CSSProperties = {
-  flex: 1,
-  padding: '20px',
-  overflowY: 'auto',
-};
-
-const sectionStyle: CSSProperties = {
-  marginBottom: '24px',
-};
-
-const dividerStyle: CSSProperties = {
-  height: '1px',
-  background: 'rgba(255, 255, 255, 0.08)',
-  margin: '16px 0',
-};
-
-// Mobile drag handle
-const dragHandleStyle: CSSProperties = {
-  width: '40px',
-  height: '4px',
-  background: 'rgba(255, 255, 255, 0.3)',
-  borderRadius: '2px',
-  margin: '8px auto',
-  cursor: 'grab',
-};
-
-// Fallback badge
-const fallbackBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '4px 8px',
-  background: 'rgba(234, 179, 8, 0.2)',
-  border: '1px solid rgba(234, 179, 8, 0.3)',
-  borderRadius: '4px',
-  color: '#fbbf24',
-  fontSize: '0.625rem',
-  fontWeight: 500,
-};
+function getPlanetAccentClass(bodyId: string): string {
+  const mapping: Record<string, string> = {
+    '10': 'border-sun shadow-sun/20',
+    '199': 'border-mercury shadow-mercury/20',
+    '299': 'border-venus shadow-venus/20',
+    '399': 'border-earth shadow-earth/20',
+    '499': 'border-mars shadow-mars/20',
+    '599': 'border-jupiter shadow-jupiter/20',
+    '699': 'border-saturn shadow-saturn/20',
+    '799': 'border-uranus shadow-uranus/20',
+    '899': 'border-neptune shadow-neptune/20',
+  };
+  return mapping[bodyId] || 'border-white/20 shadow-white/10';
+}
 
 // --- Component ---
 
@@ -153,71 +76,75 @@ export function HUD({
     setIsExpanded(!isExpanded);
   };
 
-  // Collapsed height: 60px, Expanded: 50vh
-  const mobileHeight = isExpanded ? '50vh' : '60px';
+  const accentClass = selectedPlanet ? getPlanetAccentClass(selectedPlanet.bodyId) : 'border-white/10 shadow-black/40';
 
   if (isMobile) {
     return (
-      <div style={{ ...bottomSheetBaseStyle, height: mobileHeight }}>
-        {/* Drag handle */}
-        <div style={dragHandleStyle} onClick={toggleExpand} />
+      <div
+        className={`fixed bottom-0 left-0 right-0 glass-panel rounded-t-2xl z-[100] transition-all duration-500 ease-in-out hardware-accel ${accentClass}`}
+        /* mobileSheetStyle */
+        style={{ height: isExpanded ? '55vh' : '64px' }}
+      >
+        {/* Drag handle area */}
+        <div
+          className="w-full h-8 flex items-center justify-center cursor-pointer"
+          /* dragHandleAreaStyle */
+          onClick={toggleExpand}
+        >
+          <div className="w-10 h-1 bg-white/30 rounded-full" />{/* dragHandleStyle */}
+        </div>
 
         {/* Collapsed preview */}
         {!isExpanded && (
           <div
-            style={{
-              padding: '0 20px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-            }}
+            className="px-6 pb-4 flex items-center justify-between cursor-pointer"
+            /* mobilePreviewStyle */
             onClick={toggleExpand}
           >
-            <span style={{ fontWeight: 500 }}>
+            <span className="font-semibold text-lg tracking-tight">
               {selectedPlanet ? selectedPlanet.englishName : 'Solar Explorer'}
             </span>
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-              Tap to expand
+            <span className="text-xs font-medium text-white/50 uppercase tracking-widest">
+              Tap to explore
             </span>
           </div>
         )}
 
         {/* Expanded content */}
-        {isExpanded && (
-          <div style={contentStyle}>
+        <div className={`px-6 pb-8 overflow-y-auto h-[calc(55vh-32px)] transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          {/* expandedContentStyle */}
+          <div className="space-y-6 pt-2">
             {/* Date Selector */}
-            <div style={sectionStyle}>
-              <DateSelector
-                currentDate={currentDate}
-                onDateChange={onDateChange}
-                onRefresh={onRefresh}
-              />
-            </div>
+            <DateSelector
+              currentDate={currentDate}
+              onDateChange={onDateChange}
+              onRefresh={onRefresh}
+            />
 
-            <div style={dividerStyle} />
+            <div className="h-px bg-white/10" />
 
             {/* Planet Info */}
-            <div style={sectionStyle}>
-              <PlanetInfo
-                planet={selectedPlanet}
-                earthPosition={earthPosition}
-              />
-            </div>
+            <PlanetInfo
+              planet={selectedPlanet}
+              earthPosition={earthPosition}
+            />
           </div>
-        )}
+        </div>
       </div>
     );
   }
 
   // Desktop sidebar
   return (
-    <div style={sidebarStyle}>
+    <div className={`fixed top-4 right-4 bottom-4 w-80 glass-panel rounded-2xl z-[100] flex flex-col overflow-hidden transition-all duration-700 hardware-accel border-l-2 ${accentClass} ${selectedPlanet ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-90'}`}>
+      {/* sidebarStyle */}
       {/* Header */}
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Solar Explorer</h1>
+      <div className="p-6 pb-4 border-b border-white/10 flex items-center justify-between">{/* sidebarHeaderStyle */}
+        <h1 className="text-sm font-bold text-white/70 tracking-[0.15em] uppercase">
+          Solar Explorer
+        </h1>
         {isFallback && (
-          <div style={fallbackBadgeStyle}>
+          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-[10px] font-bold text-yellow-500 uppercase">
             <span>⚠️</span>
             <span>Offline</span>
           </div>
@@ -225,26 +152,27 @@ export function HUD({
       </div>
 
       {/* Content */}
-      <div style={contentStyle}>
-        {/* Date Selector */}
-        <div style={sectionStyle}>
+      <div className="flex-1 p-6 overflow-y-auto scrollbar-hide">{/* sidebarContentStyle */}
+        <div className="space-y-8">
+          {/* Date Selector */}
           <DateSelector
             currentDate={currentDate}
             onDateChange={onDateChange}
             onRefresh={onRefresh}
           />
-        </div>
 
-        <div style={dividerStyle} />
+          <div className="h-px bg-white/5" />
 
-        {/* Planet Info */}
-        <div style={sectionStyle}>
+          {/* Planet Info */}
           <PlanetInfo
             planet={selectedPlanet}
             earthPosition={earthPosition}
           />
         </div>
       </div>
+
+      {/* Decorative footer element */}
+      <div className="h-1 w-full bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-50" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, CSSProperties } from 'react';
+import { useState } from 'react';
 
 // --- Types ---
 
@@ -36,86 +36,6 @@ function addYears(dateString: string, years: number): string {
 function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
-
-// --- Styles ---
-
-const containerStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '12px',
-};
-
-const labelStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  color: 'rgba(255, 255, 255, 0.5)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-};
-
-const inputContainerStyle: CSSProperties = {
-  display: 'flex',
-  gap: '8px',
-};
-
-const inputStyle: CSSProperties = {
-  flex: 1,
-  padding: '10px 12px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '8px',
-  color: '#fff',
-  fontSize: '0.875rem',
-  fontFamily: 'monospace',
-  outline: 'none',
-  transition: 'border-color 0.2s, box-shadow 0.2s',
-};
-
-const inputErrorStyle: CSSProperties = {
-  ...inputStyle,
-  borderColor: 'rgba(239, 68, 68, 0.5)',
-  boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.2)',
-};
-
-const refreshButtonStyle: CSSProperties = {
-  padding: '10px 12px',
-  background: 'rgba(59, 130, 246, 0.2)',
-  border: '1px solid rgba(59, 130, 246, 0.3)',
-  borderRadius: '8px',
-  color: '#3b82f6',
-  fontSize: '1rem',
-  cursor: 'pointer',
-  transition: 'background 0.2s',
-};
-
-const presetsContainerStyle: CSSProperties = {
-  display: 'flex',
-  gap: '8px',
-  flexWrap: 'wrap',
-};
-
-const presetButtonStyle: CSSProperties = {
-  padding: '6px 12px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '6px',
-  color: 'rgba(255, 255, 255, 0.8)',
-  fontSize: '0.75rem',
-  cursor: 'pointer',
-  transition: 'background 0.2s, border-color 0.2s',
-};
-
-const presetButtonActiveStyle: CSSProperties = {
-  ...presetButtonStyle,
-  background: 'rgba(139, 92, 246, 0.2)',
-  borderColor: 'rgba(139, 92, 246, 0.5)',
-  color: '#a78bfa',
-};
-
-const errorTextStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  color: '#ef4444',
-  marginTop: '4px',
-};
 
 // --- Component ---
 
@@ -175,11 +95,13 @@ export function DateSelector({ currentDate, onDateChange, onRefresh }: DateSelec
   const isToday = currentDate === today;
 
   return (
-    <div style={containerStyle}>
-      <label style={labelStyle}>Simulation Date</label>
+    <div className="flex flex-col gap-3">{/* containerStyle */}
+      <label className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">{/* labelStyle */}
+        Simulation Date
+      </label>
 
       {/* Date input + refresh button */}
-      <div style={inputContainerStyle}>
+      <div className="flex gap-2">{/* inputContainerStyle */}
         <input
           type="date"
           value={inputValue}
@@ -188,11 +110,15 @@ export function DateSelector({ currentDate, onDateChange, onRefresh }: DateSelec
           onKeyDown={handleKeyPress}
           min={MIN_DATE}
           max={MAX_DATE}
-          style={error ? inputErrorStyle : inputStyle}
+          className={`flex-1 px-4 py-2 bg-white/5 border rounded-xl text-sm font-mono transition-all duration-300 outline-none focus:ring-2 focus:ring-white/10 ${error
+            ? 'border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' /* inputErrorStyle */
+            : 'border-white/10 hover:border-white/20 focus:border-white/30' /* inputStyle */
+            }`}
         />
         {onRefresh && (
           <button
-            style={refreshButtonStyle}
+            className="px-3.5 py-2 bg-blue-500/20 border border-blue-500/30 rounded-xl text-blue-400 hover:bg-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg shadow-blue-500/10"
+            /* buttonStyle */
             onClick={onRefresh}
             title="Refresh data"
           >
@@ -202,24 +128,33 @@ export function DateSelector({ currentDate, onDateChange, onRefresh }: DateSelec
       </div>
 
       {/* Error message */}
-      {error && <span style={errorTextStyle}>{error}</span>}
+      <div className={`overflow-hidden transition-all duration-300 ${error ? 'h-6 opacity-100' : 'h-0 opacity-0'}`}>{/* errorStyle */}
+        <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wider italic">
+          {error}
+        </span>
+      </div>
 
       {/* Preset buttons */}
-      <div style={presetsContainerStyle}>
+      <div className="flex gap-2 flex-wrap">{/* presetsContainerStyle */}
         <button
-          style={isToday ? presetButtonActiveStyle : presetButtonStyle}
+          className={`flex-1 min-w-[70px] px-3 py-1.5 transition-all duration-300 rounded-lg text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border ${isToday
+            ? 'bg-purple-500/30 border-purple-500/50 text-purple-200 shadow-lg shadow-purple-500/20' /* presetButtonActiveStyle */
+            : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20 hover:text-white/60' /* presetButtonStyle */
+            }`}
           onClick={() => handlePreset('today')}
         >
           Today
         </button>
         <button
-          style={presetButtonStyle}
+          className="flex-1 min-w-[70px] px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white/40 hover:bg-white/10 hover:border-white/20 hover:text-white/60 transition-all duration-300"
+          /* presetButtonStyle */
           onClick={() => handlePreset('-1year')}
         >
-          − 1 Year
+          - 1 Year
         </button>
         <button
-          style={presetButtonStyle}
+          className="flex-1 min-w-[70px] px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white/40 hover:bg-white/10 hover:border-white/20 hover:text-white/60 transition-all duration-300"
+          /* presetButtonStyle */
           onClick={() => handlePreset('+1year')}
         >
           + 1 Year

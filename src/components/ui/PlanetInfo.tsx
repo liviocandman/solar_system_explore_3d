@@ -1,6 +1,5 @@
 'use client';
 
-import { CSSProperties } from 'react';
 import { PLANET_CONFIG } from '@/lib/textureConfig';
 
 // --- Types ---
@@ -40,90 +39,6 @@ function formatNumber(num: number, decimals = 1): string {
   return num.toFixed(decimals);
 }
 
-// --- Styles ---
-
-const containerStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px',
-};
-
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  marginBottom: '8px',
-};
-
-const planetIconStyle: CSSProperties = {
-  width: '48px',
-  height: '48px',
-  borderRadius: '50%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '24px',
-};
-
-const planetNameStyle: CSSProperties = {
-  fontSize: '1.5rem',
-  fontWeight: 600,
-  color: '#fff',
-  margin: 0,
-};
-
-const planetTypeStyle: CSSProperties = {
-  fontSize: '0.875rem',
-  color: 'rgba(255, 255, 255, 0.5)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-};
-
-const statsGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: '12px',
-};
-
-const statCardStyle: CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.05)',
-  borderRadius: '8px',
-  padding: '12px',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-};
-
-const statLabelStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  color: 'rgba(255, 255, 255, 0.5)',
-  marginBottom: '4px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-};
-
-const statValueStyle: CSSProperties = {
-  fontSize: '1.125rem',
-  fontWeight: 600,
-  color: '#fff',
-};
-
-const statUnitStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  color: 'rgba(255, 255, 255, 0.5)',
-  marginLeft: '4px',
-};
-
-const emptyStateStyle: CSSProperties = {
-  textAlign: 'center',
-  padding: '32px 16px',
-  color: 'rgba(255, 255, 255, 0.5)',
-};
-
-const emptyIconStyle: CSSProperties = {
-  fontSize: '48px',
-  marginBottom: '16px',
-  opacity: 0.5,
-};
-
 // --- Planet Type Icons ---
 
 const PLANET_ICONS: Record<string, string> = {
@@ -137,8 +52,8 @@ const PLANET_ICONS: Record<string, string> = {
 export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
   if (!planet) {
     return (
-      <div style={emptyStateStyle}>
-        <div style={emptyIconStyle}>🌍</div>
+      <div className="text-center py-8 px-4 text-white/50 animate-in fade-in duration-700">{/* emptyStateStyle */}
+        <div className="text-5xl mb-4 opacity-50">🌍</div>{/* emptyIconStyle */}
         <p>Select a planet to view details</p>
       </div>
     );
@@ -149,9 +64,8 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
   const orbitalPeriod = config?.orbitalPeriod || 0;
 
   // Calculate orbital velocity (km/s) using v = 2πr/T
-  // r in km, T in seconds
-  const orbitalRadius = planet.distanceFromSun * 1e6; // Convert million km to km
-  const orbitalPeriodSeconds = orbitalPeriod * 24 * 60 * 60; // Days to seconds
+  const orbitalRadius = planet.distanceFromSun * 1e6;
+  const orbitalPeriodSeconds = orbitalPeriod * 24 * 60 * 60;
   const orbitalVelocity = orbitalPeriodSeconds > 0
     ? (2 * Math.PI * orbitalRadius) / orbitalPeriodSeconds
     : 0;
@@ -161,62 +75,87 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
     ? calculateMillionKmDistance(planet.position, earthPosition)
     : null;
 
+  const planetIcon = PLANET_ICONS[planetType] || '🪐';
+  const fallbackColor = config?.fallbackColor || '#666';
+
   return (
-    <div style={containerStyle}>
+    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">{/* containerStyle */}
       {/* Header */}
-      <div style={headerStyle}>
+      <div className="flex items-center gap-3 mb-2">{/* headerStyle */}
         <div
+          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+          /* planetIconStyle */
           style={{
-            ...planetIconStyle,
-            background: config?.fallbackColor || '#666',
-            boxShadow: `0 0 20px ${config?.fallbackColor || '#666'}40`,
+            background: `radial-gradient(circle at 30% 30%, ${fallbackColor}aa, ${fallbackColor})`,
+            boxShadow: `0 0 20px ${fallbackColor}40`,
           }}
         >
-          {PLANET_ICONS[planetType] || '🪐'}
+          {planetIcon}
         </div>
-        <div>
-          <h2 style={planetNameStyle}>{planet.englishName}</h2>
-          <span style={planetTypeStyle}>{planetType.replace('_', ' ')}</span>
+        <div className="flex flex-col">
+          <h2 className="text-2xl font-semibold text-white m-0">{/* planetNameStyle */}
+            {planet.englishName}
+          </h2>
+          <span className="text-sm text-white/50 uppercase tracking-widest">{/* planetTypeStyle */}
+            {planetType.replace('_', ' ')}
+          </span>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div style={statsGridStyle}>
+      <div className="grid grid-cols-2 gap-3">{/* statsGridStyle */}
         {/* Distance from Sun */}
-        <div style={statCardStyle}>
-          <div style={statLabelStyle}>Distance from Sun</div>
-          <div style={statValueStyle}>
-            {formatNumber(planet.distanceFromSun)}
-            <span style={statUnitStyle}>M km</span>
-          </div>
-        </div>
+        <StatCard
+          label="Distance from Sun"
+          value={formatNumber(planet.distanceFromSun)}
+          unit="M km"
+        />
 
         {/* Distance from Earth */}
-        <div style={statCardStyle}>
-          <div style={statLabelStyle}>Distance from Earth</div>
-          <div style={statValueStyle}>
-            {distanceFromEarth !== null ? formatNumber(distanceFromEarth) : '—'}
-            <span style={statUnitStyle}>M km</span>
-          </div>
-        </div>
+        <StatCard
+          label="Distance from Earth"
+          value={distanceFromEarth !== null ? formatNumber(distanceFromEarth) : '—'}
+          unit="M km"
+        />
 
         {/* Orbital Velocity */}
-        <div style={statCardStyle}>
-          <div style={statLabelStyle}>Orbital Velocity</div>
-          <div style={statValueStyle}>
-            {orbitalVelocity > 0 ? formatNumber(orbitalVelocity) : '—'}
-            <span style={statUnitStyle}>km/s</span>
-          </div>
-        </div>
+        <StatCard
+          label="Orbital Velocity"
+          value={orbitalVelocity > 0 ? formatNumber(orbitalVelocity) : '—'}
+          unit="km/s"
+        />
 
         {/* Orbital Period */}
-        <div style={statCardStyle}>
-          <div style={statLabelStyle}>Orbital Period</div>
-          <div style={statValueStyle}>
-            {orbitalPeriod > 0 ? formatNumber(orbitalPeriod, 0) : '—'}
-            <span style={statUnitStyle}>days</span>
-          </div>
-        </div>
+        <StatCard
+          label="Orbital Period"
+          value={orbitalPeriod > 0 ? formatNumber(orbitalPeriod, 0) : '—'}
+          unit="days"
+        />
+      </div>
+
+      {/* Footer Info */}
+      <div className="p-3 bg-white/5 border border-white/5 rounded-lg">
+        <p className="text-[10px] text-white/40 italic">
+          High-precision ephemeris data provided by NASA JPL Horizons.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="bg-white/5 rounded-lg p-3 border border-white/10 group transition-colors hover:bg-white/10 flex flex-col justify-between min-w-0">{/* statCardStyle */}
+      <div className="text-[10px] text-white/50 mb-1.5 uppercase tracking-wider group-hover:text-white/70 transition-colors leading-tight">{/* statLabelStyle */}
+        {label}
+      </div>
+      <div className="flex items-baseline gap-1 flex-wrap min-w-0">
+        <span className="text-base font-semibold text-white truncate">{/* statValueStyle */}
+          {value}
+        </span>
+        <span className="text-[10px] text-white/50 uppercase tracking-tighter shrink-0">{/* statUnitStyle */}
+          {unit}
+        </span>
       </div>
     </div>
   );

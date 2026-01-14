@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Suspense, ReactNode, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import { QualityTierProvider, useQualityTier } from '@/contexts/QualityTierContext';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -11,6 +11,7 @@ import type { EphemerisData } from '@/lib/types';
 import { getPlanetConfig } from '@/lib/textureConfig';
 import { getDidacticRadius, scalePositionFromKm } from '@/lib/scales';
 import { CameraController } from '@/hooks/useCameraAnimation';
+import * as THREE from 'three';
 
 // --- Types ---
 
@@ -38,16 +39,45 @@ interface SceneContentProps {
   selectedPlanetPosition?: { x: number; y: number; z: number } | null;
 }
 
+// --- Helper Components ---
+
+function SelectionRing({ position, radius }: { position: [number, number, number]; radius: number }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (!meshRef.current) return;
+
+    // Smooth rotation
+    meshRef.current.rotation.z += 0.01;
+
+    // Subtle pulse
+    const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.05;
+    meshRef.current.scale.set(scale, scale, scale);
+  });
+
+  return (
+    <mesh ref={meshRef} position={position} rotation={[Math.PI / 2, 0, 0]}>
+      {/* Parameters: radius, tube, radialSegments, tubularSegments */}
+      <torusGeometry args={[radius * 1.5, 0.05 * (radius / 10), 16, 100]} />
+      <meshBasicMaterial
+        color="#ffffff"
+        transparent
+        opacity={0.6}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 // --- Constants ---
 
 const CAMERA_CONFIG = {
   position: [0, 200, 500] as [number, number, number], // Scaled initial position
   fov: 45,
   near: 0.1,
-  far: 20000, // Optimized for 1 unit = 1M km
+  far: 20000,
 };
 
-// Sun body ID (excluded from planet rendering)
 const SUN_BODY_ID = '10';
 
 /**
@@ -59,7 +89,7 @@ function calculateMillionKmFromSun(position: [number, number, number]): number {
   return Math.sqrt(x * x + y * y + z * z);
 }
 
-// --- Inner Scene Component (uses quality context) ---
+// --- Inner Scene Component ---
 
 function SceneContent({
   children,
@@ -70,7 +100,6 @@ function SceneContent({
 }: SceneContentProps) {
   const { settings, tier } = useQualityTier();
 
-  // React 19 compiler auto-memoizes - plain computation
   const planetsToRender = (() => {
     if (!ephemerisData || ephemerisData.length === 0) {
       return [];
@@ -80,12 +109,8 @@ function SceneContent({
       .filter(body => body.bodyId !== SUN_BODY_ID) // Exclude Sun (rendered separately)
       .map(body => {
         const config = getPlanetConfig(body.bodyId);
-        if (!config) {
-          console.warn(`[SceneContent] No config for bodyId: ${body.bodyId}`);
-          return null;
-        }
+        if (!config) return null;
 
-        // Scale real km position to scene units
         const position = scalePositionFromKm(
           body.position.x,
           body.position.y,
@@ -114,7 +139,7 @@ function SceneContent({
     const planet = planetsToRender.find(p => p?.name === name);
 
     if (planet) {
-      const selectedPlanet: SelectedPlanet = {
+      const selected: SelectedPlanet = {
         bodyId: planet.bodyId,
         name: planet.name,
         englishName: planet.englishName,
@@ -125,11 +150,11 @@ function SceneContent({
         },
         distanceFromSun: planet.distanceFromSun,
       };
-
-      console.log(`[Scene] Planet selected: ${planet.englishName}`, selectedPlanet);
-      onPlanetClick(selectedPlanet);
+      onPlanetClick(selected);
     }
   };
+
+  const selectedPlanet = planetsToRender.find(p => p?.bodyId === selectedPlanetId);
 
   return (
     <Canvas
@@ -147,8 +172,7 @@ function SceneContent({
         }
       }}
     >
-      {/* Ambient light for base visibility */}
-      <ambientLight intensity={0.1} />
+      <ambientLight intensity={0.15} />
 
       {/* Stars background */}
       <Stars
@@ -165,7 +189,7 @@ function SceneContent({
         enableDamping
         dampingFactor={0.05}
         minDistance={1}
-        maxDistance={12000} // Neptune is at ~4500, extra room for viewing
+        maxDistance={12000}
         enablePan
         panSpeed={0.5}
         rotateSpeed={0.5}
@@ -178,15 +202,12 @@ function SceneContent({
       {/* Dynamically render all planets from ephemeris data */}
       {planetsToRender.map((planet) => {
         if (!planet) return null;
-
-        const isSelected = selectedPlanetId === planet.bodyId;
-
         return (
           <CelestialBody
             key={planet.bodyId}
             name={planet.name}
             position={planet.position}
-            radius={planet.radius * (isSelected ? 1.1 : 1)} // Slight scale on selection
+            radius={planet.radius}
             textureUrl={planet.texturePath}
             rotationSpeed={planet.rotationSpeed}
             onClick={handlePlanetClick}
@@ -194,7 +215,14 @@ function SceneContent({
         );
       })}
 
-      {/* Camera animation controller */}
+      {/* Selection Ring */}
+      {selectedPlanet && (
+        <SelectionRing
+          position={selectedPlanet.position}
+          radius={selectedPlanet.radius}
+        />
+      )}
+
       <CameraController targetPosition={selectedPlanetPosition} />
 
       {/* Additional scene content */}
@@ -215,15 +243,7 @@ export function SceneManager({
   return (
     <QualityTierProvider>
       <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          overflow: 'hidden',
-          background: '#000',
-        }}
+        className="fixed inset-0 overflow-hidden bg-[#000]"
       >
         <Suspense fallback={<LoadingScreen />}>
           <SceneContent

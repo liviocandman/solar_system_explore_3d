@@ -1,7 +1,5 @@
 'use client';
 
-import { CSSProperties } from 'react';
-
 // --- Types ---
 
 export type LoadingStage = 'initializing' | 'fetching_data' | 'loading_textures' | 'ready';
@@ -40,135 +38,42 @@ function getStageMessage(progress?: LoadingProgress): string {
   }
 }
 
-// --- Styles ---
-
-const containerStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100vw',
-  height: '100vh',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)',
-  color: '#ffffff',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  zIndex: 9999,
-};
-
-const spinnerContainerStyle: CSSProperties = {
-  position: 'relative',
-  width: '80px',
-  height: '80px',
-  marginBottom: '24px',
-};
-
-const orbitRingStyle: CSSProperties = {
-  position: 'absolute',
-  width: '100%',
-  height: '100%',
-  border: '2px solid rgba(100, 150, 255, 0.2)',
-  borderTopColor: '#6496ff',
-  borderRadius: '50%',
-  animation: 'spin 1.2s linear infinite',
-};
-
-const innerOrbitStyle: CSSProperties = {
-  position: 'absolute',
-  top: '15px',
-  left: '15px',
-  width: '50px',
-  height: '50px',
-  border: '2px solid rgba(255, 180, 100, 0.2)',
-  borderTopColor: '#ffb464',
-  borderRadius: '50%',
-  animation: 'spin 0.8s linear infinite reverse',
-};
-
-const planetDotStyle: CSSProperties = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: '12px',
-  height: '12px',
-  backgroundColor: '#ffd700',
-  borderRadius: '50%',
-  boxShadow: '0 0 20px rgba(255, 215, 0, 0.6)',
-};
-
-const messageStyle: CSSProperties = {
-  fontSize: '1rem',
-  fontWeight: 500,
-  letterSpacing: '0.05em',
-  opacity: 0.9,
-  marginBottom: '16px',
-};
-
-const progressContainerStyle: CSSProperties = {
-  width: '200px',
-  height: '4px',
-  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  borderRadius: '2px',
-  overflow: 'hidden',
-  marginBottom: '8px',
-};
-
-const progressBarBaseStyle: CSSProperties = {
-  height: '100%',
-  borderRadius: '2px',
-  transition: 'width 0.3s ease-out',
-};
-
-const progressTextStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  opacity: 0.6,
-  fontFamily: 'monospace',
-};
-
-const keyframesStyle = `
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-`;
-
 // --- Component ---
 
 export function LoadingScreen({ message, progress }: LoadingScreenProps) {
   const displayMessage = message || getStageMessage(progress);
   const progressPercent = progress?.progress ?? 0;
 
-  // Gradient color based on progress
-  const progressBarStyle: CSSProperties = {
-    ...progressBarBaseStyle,
-    width: `${progressPercent}%`,
-    background: progressPercent < 50
-      ? 'linear-gradient(90deg, #6496ff, #8b5cf6)'
-      : progressPercent < 100
-        ? 'linear-gradient(90deg, #8b5cf6, #22c55e)'
-        : '#22c55e',
-  };
-
   return (
-    <div style={containerStyle}>
-      <style>{keyframesStyle}</style>
-      <div style={spinnerContainerStyle}>
-        <div style={orbitRingStyle} />
-        <div style={innerOrbitStyle} />
-        <div style={planetDotStyle} />
+    <div className="fixed inset-0 w-screen h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] text-white z-[9999]">{/* containerStyle */}
+      <div className="relative w-20 h-20 mb-6">{/* spinnerContainerStyle */}
+        <div className="absolute w-full h-full border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />{/* orbitRingStyle */}
+        <div className="absolute top-[15px] left-[15px] w-[50px] h-[50px] border-2 border-orange-500/20 border-t-orange-400 rounded-full animate-[spin_0.8s_linear_infinite_reverse]" />{/* innerOrbitStyle */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-yellow-400 rounded-full shadow-[0_0_20px_rgba(255,215,0,0.6)]" />{/* planetDotStyle */}
       </div>
-      <p style={messageStyle}>{displayMessage}</p>
+
+      <p className="text-base font-medium tracking-wider opacity-90 mb-4">{/* messageStyle */}
+        {displayMessage}
+      </p>
 
       {/* Progress bar */}
-      <div style={progressContainerStyle}>
-        <div style={progressBarStyle} />
+      <div className="w-[200px] h-1 bg-white/10 rounded-sm overflow-hidden mb-2">{/* progressContainerStyle */}
+        <div
+          className="h-full rounded-sm transition-all duration-300 ease-out"
+          /* progressBarBaseStyle */
+          style={{
+            width: `${progressPercent}%`,
+            background: progressPercent < 50
+              ? 'linear-gradient(90deg, #6496ff, #8b5cf6)'
+              : progressPercent < 100
+                ? 'linear-gradient(90deg, #8b5cf6, #22c55e)'
+                : '#22c55e',
+          }}
+        />
       </div>
 
       {/* Progress percentage */}
-      <span style={progressTextStyle}>
+      <span className="text-xs opacity-60 font-mono tracking-tighter">{/* progressTextStyle */}
         {progressPercent}%
       </span>
     </div>

@@ -1,7 +1,5 @@
 'use client';
 
-import { CSSProperties } from 'react';
-
 // --- Types ---
 
 export type ErrorType =
@@ -33,8 +31,8 @@ interface ErrorOverlayProps {
 
 const ERROR_MESSAGES: Record<ErrorType, { title: string; description: string; icon: string }> = {
   NASA_API_ERROR: {
-    title: 'NASA API Error',
-    description: 'Unable to fetch orbital data from NASA. The service may be temporarily unavailable.',
+    title: 'NASA API ERROR',
+    description: 'Unable to fetch orbital data from JPL Horizons. The service may be offline.',
     icon: '🛰️',
   },
   NETWORK_ERROR: {
@@ -74,119 +72,6 @@ const ERROR_MESSAGES: Record<ErrorType, { title: string; description: string; ic
   },
 };
 
-// --- Styles ---
-
-const overlayStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100vw',
-  height: '100vh',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'linear-gradient(135deg, rgba(10, 10, 15, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)',
-  backdropFilter: 'blur(10px)',
-  color: '#ffffff',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  zIndex: 10000,
-  padding: '24px',
-};
-
-const cardStyle: CSSProperties = {
-  maxWidth: '480px',
-  width: '100%',
-  padding: '32px',
-  background: 'rgba(0, 0, 0, 0.5)',
-  borderRadius: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  textAlign: 'center',
-};
-
-const iconStyle: CSSProperties = {
-  fontSize: '48px',
-  marginBottom: '16px',
-};
-
-const titleStyle: CSSProperties = {
-  fontSize: '1.5rem',
-  fontWeight: 600,
-  marginBottom: '12px',
-  color: '#fff',
-};
-
-const descriptionStyle: CSSProperties = {
-  fontSize: '1rem',
-  lineHeight: 1.6,
-  color: 'rgba(255, 255, 255, 0.7)',
-  marginBottom: '24px',
-};
-
-const buttonStyle: CSSProperties = {
-  padding: '12px 32px',
-  fontSize: '1rem',
-  fontWeight: 500,
-  color: '#fff',
-  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-  border: 'none',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  transition: 'transform 0.2s, box-shadow 0.2s',
-  marginRight: '12px',
-};
-
-const buttonDisabledStyle: CSSProperties = {
-  ...buttonStyle,
-  opacity: 0.5,
-  cursor: 'not-allowed',
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  padding: '12px 32px',
-  fontSize: '1rem',
-  fontWeight: 500,
-  color: 'rgba(255, 255, 255, 0.8)',
-  background: 'rgba(255, 255, 255, 0.1)',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  transition: 'background 0.2s',
-};
-
-const badgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '8px 16px',
-  background: 'rgba(234, 179, 8, 0.2)',
-  border: '1px solid rgba(234, 179, 8, 0.3)',
-  borderRadius: '8px',
-  color: '#fbbf24',
-  fontSize: '0.875rem',
-  fontWeight: 500,
-  marginBottom: '24px',
-};
-
-const technicalStyle: CSSProperties = {
-  marginTop: '24px',
-  padding: '12px',
-  background: 'rgba(0, 0, 0, 0.3)',
-  borderRadius: '8px',
-  fontSize: '0.75rem',
-  fontFamily: 'monospace',
-  color: 'rgba(255, 255, 255, 0.5)',
-  textAlign: 'left',
-  maxHeight: '100px',
-  overflow: 'auto',
-};
-
-const retryInfoStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  color: 'rgba(255, 255, 255, 0.5)',
-  marginTop: '12px',
-};
-
 // --- Component ---
 
 export function ErrorOverlay({
@@ -205,62 +90,82 @@ export function ErrorOverlay({
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={cardStyle}>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-[#020617]/90 backdrop-blur-xl transition-all duration-700">{/* overlayStyle */}
+      <div className="max-w-md w-full glass-panel p-10 rounded-3xl text-center border border-red-500/20 shadow-xl shadow-red-500/10">{/* cardStyle */}
         {/* Fallback mode badge */}
-        {isFallbackActive && (
-          <div style={badgeStyle}>
+        <div className={`overflow-hidden transition-all duration-500 mb-8 ${isFallbackActive ? 'h-10 opacity-100' : 'h-0 opacity-0'}`}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-xs font-bold text-yellow-500 uppercase tracking-widest animate-pulse">{/* badgeStyle */}
             <span>⚠️</span>
             <span>Fallback Mode Active</span>
           </div>
-        )}
+        </div>
 
         {/* Error icon */}
-        <div style={iconStyle}>{errorInfo.icon}</div>
+        <div className="text-6xl mb-6 hardware-accel animate-bounce duration-[2000ms]">{/* iconStyle */}
+          {errorInfo.icon}
+        </div>
 
         {/* Title */}
-        <h2 style={titleStyle}>{errorInfo.title}</h2>
+        <h2 className="text-xl font-bold text-white tracking-[0.2em] uppercase mb-4">{/* titleStyle */}
+          {errorInfo.title}
+        </h2>
 
         {/* Description */}
-        <p style={descriptionStyle}>{errorInfo.description}</p>
+        <p className="text-sm font-medium text-white/50 leading-relaxed mb-10">{/* descriptionStyle */}
+          {errorInfo.description}
+        </p>
 
         {/* Action buttons */}
-        <div>
+        <div className="flex flex-col gap-4">
           {isWebGLError ? (
-            <button style={buttonStyle} onClick={handleReload}>
-              Reload Page
+            <button
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-95"
+              /* buttonStyle */
+              onClick={handleReload}
+            >
+              System Reboot
             </button>
           ) : (
             <>
               {error.canRetry && (
                 <button
-                  style={canRetry ? buttonStyle : buttonDisabledStyle}
+                  className={`w-full py-3.5 rounded-xl font-bold tracking-widest uppercase text-xs transition-all duration-300 active:scale-95 ${canRetry
+                    ? 'bg-white text-black hover:bg-white/90 shadow-lg shadow-white/10' /* buttonStyle */
+                    : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed' /* buttonDisabledStyle */
+                    }`}
                   onClick={canRetry ? onRetry : undefined}
                   disabled={!canRetry}
                 >
-                  {canRetry ? 'Try Again' : 'Max Retries Reached'}
+                  {canRetry ? 'Re-attempt Link' : 'Retries Exhausted'}
                 </button>
               )}
-              <button style={secondaryButtonStyle} onClick={handleReload}>
-                Refresh Page
+              <button
+                className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-bold tracking-widest uppercase text-xs transition-all duration-300 active:scale-95"
+                /* secondaryButtonStyle */
+                onClick={handleReload}
+              >
+                Manual Refresh
               </button>
             </>
           )}
         </div>
 
         {/* Retry count info */}
-        {error.canRetry && retryCount > 0 && (
-          <p style={retryInfoStyle}>
-            Retry attempt {retryCount} of {maxRetries}
+        <div className={`overflow-hidden transition-all duration-300 mt-6 ${error.canRetry && retryCount > 0 ? 'h-5 opacity-100' : 'h-0 opacity-0'}`}>
+          <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">{/* retryInfoStyle */}
+            Attempt {retryCount} of {maxRetries}
           </p>
-        )}
+        </div>
 
-        {/* Technical details (collapsible in future) */}
+        {/* Technical details */}
         {error.technicalDetails && (
-          <div style={technicalStyle}>
-            <strong>Technical Details:</strong>
-            <br />
-            {error.technicalDetails}
+          <div className="mt-10 p-4 bg-black/40 rounded-xl border border-white/5 text-left group">
+            <div className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-2 group-hover:text-white/40 transition-colors uppercaseTracking">{/* technicalStyle label */}
+              Technical Logs
+            </div>
+            <div className="text-[10px] font-mono text-white/30 truncate group-hover:whitespace-normal transition-all duration-300">{/* technicalStyle content */}
+              {error.technicalDetails}
+            </div>
           </div>
         )}
       </div>
