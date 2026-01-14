@@ -1,88 +1,144 @@
 {
-  "description": "Fallback ephemeris data with approximate orbital positions. Based on mean orbital elements. Positions are in scene units (1 AU = 30 units).",
-  "source": "Mean orbital elements from NASA planetary fact sheets",
-  "generatedAt": "2026-01-12",
+  "meta": {
+    "source": "FALLBACK_DATASET",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "cached": false
+  },
   "data": [
     {
       "bodyId": "10",
-      "name": "Sun",
+      "name": "Sol",
       "position": {
         "x": 0,
         "y": 0,
         "z": 0
-      }
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "199",
-      "name": "Mercury",
+      "name": "Mercúrio",
       "position": {
-        "x": 11.6,
+        "x": 57900000,
         "y": 0,
         "z": 0
-      }
+      },
+      "velocity": {
+        "x": 0,
+        "y": 47.36,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "299",
-      "name": "Venus",
+      "name": "Vênus",
       "position": {
-        "x": 0,
+        "x": 108200000,
         "y": 0,
-        "z": 21.7
-      }
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 35.02,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "399",
-      "name": "Earth",
+      "name": "Terra",
       "position": {
-        "x": -30,
+        "x": 149600000,
         "y": 0,
         "z": 0
-      }
+      },
+      "velocity": {
+        "x": 0,
+        "y": 29.78,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "499",
-      "name": "Mars",
+      "name": "Marte",
       "position": {
-        "x": 0,
+        "x": 227900000,
         "y": 0,
-        "z": -45.6
-      }
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 24.07,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "599",
-      "name": "Jupiter",
+      "name": "Júpiter",
       "position": {
-        "x": 156,
+        "x": 778600000,
         "y": 0,
         "z": 0
-      }
+      },
+      "velocity": {
+        "x": 0,
+        "y": 13.07,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "699",
-      "name": "Saturn",
+      "name": "Saturno",
       "position": {
-        "x": 0,
+        "x": 1433500000,
         "y": 0,
-        "z": 286.5
-      }
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 9.68,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "799",
-      "name": "Uranus",
+      "name": "Urano",
       "position": {
-        "x": -576,
+        "x": 2872500000,
         "y": 0,
         "z": 0
-      }
+      },
+      "velocity": {
+        "x": 0,
+        "y": 6.81,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     },
     {
       "bodyId": "899",
-      "name": "Neptune",
+      "name": "Netuno",
       "position": {
-        "x": 0,
+        "x": 4495100000,
         "y": 0,
-        "z": -900
-      }
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 5.43,
+        "z": 0
+      },
+      "timestamp": "2024-01-01T00:00:00Z"
     }
   ]
 }

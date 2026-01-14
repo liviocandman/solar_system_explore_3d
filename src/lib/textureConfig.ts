@@ -2,7 +2,7 @@
  * Texture Configuration
  * Maps bodyId to texture paths, visual properties, and orbital data
  */
-
+import { BodyClass } from './scales';
 
 // --- Types ---
 
@@ -11,15 +11,17 @@ export interface PlanetConfig {
   name: string;
   englishName: string;
   type: 'STAR' | 'PLANET' | 'DWARF_PLANET';
+  bodyClass: BodyClass;
   texturePath: string;
   fallbackColor: string;
-  radius: number; // Scene units
+  radius: number; // Scene units (will be computed dynamically if needed)
   rotationSpeed: number; // Radians per frame
   orbitalPeriod: number; // Earth days
   meanDistanceAU: number; // Astronomical Units from Sun
 }
 
 // --- Texture Map ---
+// Initial radius values are placeholders, they should be derived from src/lib/scales.ts in the components
 
 export const PLANET_CONFIG: Record<string, PlanetConfig> = {
   '10': {
@@ -27,9 +29,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Sol',
     englishName: 'Sun',
     type: 'STAR',
+    bodyClass: 'STAR',
     texturePath: '/textures/sun.webp',
     fallbackColor: '#FDB813',
-    radius: 10,
+    radius: 34.8, // Didactic radius
     rotationSpeed: 0.001,
     orbitalPeriod: 0,
     meanDistanceAU: 0,
@@ -39,9 +42,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Mercúrio',
     englishName: 'Mercury',
     type: 'PLANET',
+    bodyClass: 'ROCKY_PLANET',
     texturePath: '/textures/mercury.webp',
     fallbackColor: '#8C7853',
-    radius: 0.8,
+    radius: 4.8,
     rotationSpeed: 0.001,
     orbitalPeriod: 88,
     meanDistanceAU: 0.387,
@@ -51,9 +55,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Vênus',
     englishName: 'Venus',
     type: 'PLANET',
+    bodyClass: 'ROCKY_PLANET',
     texturePath: '/textures/venus.webp',
     fallbackColor: '#FFC649',
-    radius: 1.2,
+    radius: 12.1,
     rotationSpeed: 0.0005,
     orbitalPeriod: 225,
     meanDistanceAU: 0.723,
@@ -63,9 +68,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Terra',
     englishName: 'Earth',
     type: 'PLANET',
+    bodyClass: 'ROCKY_PLANET',
     texturePath: '/textures/earth.webp',
     fallbackColor: '#6B93D6',
-    radius: 1.3,
+    radius: 12.7,
     rotationSpeed: 0.002,
     orbitalPeriod: 365,
     meanDistanceAU: 1.0,
@@ -75,9 +81,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Marte',
     englishName: 'Mars',
     type: 'PLANET',
+    bodyClass: 'ROCKY_PLANET',
     texturePath: '/textures/mars.webp',
     fallbackColor: '#C1440E',
-    radius: 1.0,
+    radius: 6.7,
     rotationSpeed: 0.0019,
     orbitalPeriod: 687,
     meanDistanceAU: 1.524,
@@ -87,9 +94,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Júpiter',
     englishName: 'Jupiter',
     type: 'PLANET',
+    bodyClass: 'GAS_GIANT',
     texturePath: '/textures/jupiter.webp',
     fallbackColor: '#D8CA9D',
-    radius: 4.0,
+    radius: 71.4,
     rotationSpeed: 0.004,
     orbitalPeriod: 4333,
     meanDistanceAU: 5.203,
@@ -99,9 +107,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Saturno',
     englishName: 'Saturn',
     type: 'PLANET',
+    bodyClass: 'GAS_GIANT',
     texturePath: '/textures/saturn.webp',
     fallbackColor: '#EAD6B8',
-    radius: 3.5,
+    radius: 60.2,
     rotationSpeed: 0.0038,
     orbitalPeriod: 10759,
     meanDistanceAU: 9.537,
@@ -111,9 +120,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Urano',
     englishName: 'Uranus',
     type: 'PLANET',
+    bodyClass: 'GAS_GIANT',
     texturePath: '/textures/uranus.webp',
     fallbackColor: '#D1E7E7',
-    radius: 2.0,
+    radius: 25.5,
     rotationSpeed: 0.003,
     orbitalPeriod: 30687,
     meanDistanceAU: 19.191,
@@ -123,9 +133,10 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     name: 'Netuno',
     englishName: 'Neptune',
     type: 'PLANET',
+    bodyClass: 'GAS_GIANT',
     texturePath: '/textures/neptune.webp',
     fallbackColor: '#5B5DDF',
-    radius: 1.9,
+    radius: 24.7,
     rotationSpeed: 0.0032,
     orbitalPeriod: 60190,
     meanDistanceAU: 30.069,
@@ -136,7 +147,6 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
 
 /**
  * Get texture path for a body
- * TODO: Add LOD support based on quality tier when multiple texture resolutions are available
  */
 export function getTexturePath(bodyId: string): string {
   const config = PLANET_CONFIG[bodyId];
@@ -178,9 +188,8 @@ export function calculateDistance(
   const dx = pos1.x - pos2.x;
   const dy = pos1.y - pos2.y;
   const dz = pos1.z - pos2.z;
-  // Scene units to AU: 30 units = 1 AU
-  // AU to million km: 1 AU = 149.6 million km
+
+  // Real distances in KM are handled directly now since we work with million km units
   const sceneDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-  const auDistance = sceneDistance / 30;
-  return auDistance * 149.6;
+  return sceneDistance; // In million km
 }

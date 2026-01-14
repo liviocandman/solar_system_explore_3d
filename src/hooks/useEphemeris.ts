@@ -96,7 +96,7 @@ export function useEphemeris(options: UseEphemerisOptions = {}) {
   const retryCountRef = useRef(0);
 
   // Fetch function - React 19 compiler handles memoization
-  const fetchEphemeris = async (retryAttempt = 0): Promise<void> => {
+  const fetchEphemeris = async (retryAttempt = 0, forceRefresh = false): Promise<void> => {
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -117,7 +117,12 @@ export function useEphemeris(options: UseEphemerisOptions = {}) {
         abortController.abort();
       }, timeoutMs);
 
-      const response = await fetch(`/api/ephemeris?date=${date}`, {
+      // Build URL with optional force parameter to bypass cache
+      const url = forceRefresh
+        ? `/api/ephemeris?date=${date}&force=true`
+        : `/api/ephemeris?date=${date}`;
+
+      const response = await fetch(url, {
         signal: abortController.signal,
       });
 
@@ -231,7 +236,8 @@ export function useEphemeris(options: UseEphemerisOptions = {}) {
   // Manual refresh function (forces new fetch even if cached)
   const refresh = () => {
     retryCountRef.current = 0;
-    fetchEphemeris(0);
+    console.log('[useEphemeris] Force refreshing - bypassing cache');
+    fetchEphemeris(0, true); // force=true bypasses Redis cache
   };
 
   // Auto-fetch on mount and date change

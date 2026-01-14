@@ -5,6 +5,7 @@
  * Query params:
  * - date: ISO date string (default: today)
  * - ids: comma-separated body IDs (default: all planets)
+ * - force: if 'true', bypass cache and fetch fresh data from NASA
  * 
  * Response includes meta.source field:
  * - CACHE_HIT: Data from Redis cache
@@ -69,17 +70,26 @@ export async function GET(request: NextRequest) {
   // Parse query parameters
   const dateParam = searchParams.get('date');
   const idsParam = searchParams.get('ids');
+  const forceParam = searchParams.get('force');
 
   const requestedDate = dateParam || new Date().toISOString().split('T')[0];
   const bodyIds = idsParam
     ? idsParam.split(',').map(id => id.trim())
     : ALL_PLANET_IDS;
+  const forceRefresh = forceParam === 'true';
 
   try {
-    // Step 1: Check cache for existing data
-    const { cached, missing } = await getCachedBulkEphemeris(bodyIds, requestedDate);
+    // Step 1: Check cache for existing data (skip if force=true)
+    let cached: EphemerisData[] = [];
+    let missing: string[] = bodyIds;
 
-    // If all data is cached, return immediately
+    if (!forceRefresh) {
+      const cacheResult = await getCachedBulkEphemeris(bodyIds, requestedDate);
+      cached = cacheResult.cached;
+      missing = cacheResult.missing;
+    }
+
+    // If all data is cached (and not forcing), return immediately
     if (missing.length === 0 && cached.length > 0) {
       const response: EphemerisResponse = {
         data: cached,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Toaster, toast } from 'sonner';
 import { useEphemeris } from '@/hooks/useEphemeris';
@@ -8,6 +8,8 @@ import { useLoadingProgress } from '@/hooks/useLoadingProgress';
 import { useWebGLError } from '@/hooks/useWebGLError';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ErrorOverlay } from '@/components/ui/ErrorOverlay';
+import { HUD } from '@/components/ui/HUD';
+import { BODY_IDS } from '@/lib/types';
 import type { AppError } from '@/components/ui/ErrorOverlay';
 import type { SelectedPlanet } from '@/components/three/SceneManager';
 
@@ -50,8 +52,7 @@ export default function Home() {
     isFallback,
     retry,
     retryCount,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    refresh // Will be used by HUD DateSelector in Task 5
+    refresh
   } = useEphemeris({ date: currentDate });
 
   // WebGL error detection
@@ -66,6 +67,19 @@ export default function Home() {
   // Selected planet state for HUD
   const [selectedPlanet, setSelectedPlanet] = useState<SelectedPlanet | null>(null);
 
+  // Get Earth position for distance calculations
+  const earthPosition = useMemo(() => {
+    const earth = ephemerisData.find(body => body.bodyId === BODY_IDS.EARTH);
+    if (earth) {
+      return {
+        x: earth.position.x,
+        y: earth.position.y,
+        z: earth.position.z,
+      };
+    }
+    return undefined;
+  }, [ephemerisData]);
+
   // Combine errors - WebGL errors take priority
   const activeError: AppError | null = webglError ?? (ephemerisError ? {
     type: ephemerisError.type,
@@ -77,8 +91,7 @@ export default function Home() {
   // Only show error overlay for critical errors (not when fallback is working)
   const showErrorOverlay = activeError && (!isFallback || !isWebGLSupported);
 
-  // Handle date change with validation (will be used by HUD DateSelector in Task 5)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // Handle date change with validation
   const handleDateChange = (newDate: string) => {
     if (!isValidDate(newDate)) {
       toast.error('Data inválida', {
@@ -171,81 +184,16 @@ export default function Home() {
         />
       )}
 
-      {/* Selected planet info panel (will be replaced by HUD in Task 5) */}
-      {selectedPlanet && !showLoadingScreen && !showErrorOverlay && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 20,
-            left: 20,
-            padding: '16px 24px',
-            background: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: '#fff',
-            fontFamily: 'system-ui, sans-serif',
-            zIndex: 100,
-          }}
-        >
-          <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>
-            {selectedPlanet.englishName}
-          </div>
-          <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-            Distance from Sun: {selectedPlanet.distanceFromSun.toFixed(1)} million km
-          </div>
-        </div>
-      )}
-
-      {/* Date display (temporary - will be in HUD for Task 5) */}
+      {/* HUD - Responsive sidebar (desktop) / bottom sheet (mobile) */}
       {!showLoadingScreen && !showErrorOverlay && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 20,
-            right: 20,
-            padding: '12px 16px',
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: '#fff',
-            fontFamily: 'monospace',
-            fontSize: '0.875rem',
-            zIndex: 100,
-          }}
-        >
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', marginBottom: '4px' }}>
-            Simulation Date
-          </div>
-          <div>{currentDate}</div>
-        </div>
-      )}
-
-      {/* Fallback mode indicator */}
-      {isFallback && !showLoadingScreen && !showErrorOverlay && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 20,
-            left: 20,
-            padding: '8px 16px',
-            background: 'rgba(234, 179, 8, 0.2)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '8px',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
-            color: '#fbbf24',
-            fontSize: '0.75rem',
-            fontFamily: 'system-ui, sans-serif',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span>⚠️</span>
-          <span>Modo Offline</span>
-        </div>
+        <HUD
+          selectedPlanet={selectedPlanet}
+          earthPosition={earthPosition}
+          currentDate={currentDate}
+          onDateChange={handleDateChange}
+          onRefresh={refresh}
+          isFallback={isFallback}
+        />
       )}
     </>
   );

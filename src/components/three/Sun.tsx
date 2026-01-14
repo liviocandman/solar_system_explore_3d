@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
 import type { Mesh } from 'three';
+import { getDidacticRadius } from '@/lib/scales';
 
 // --- Types ---
 
@@ -15,7 +16,9 @@ interface SunProps {
 // --- Constants ---
 
 const SUN_TEXTURE_PATH = '/textures/sun.webp';
-const DEFAULT_RADIUS = 5;
+const SUN_BODY_ID = '10';
+// Computed didactic radius: (696000 / 1000000) * 50 = 34.8
+const DEFAULT_RADIUS = getDidacticRadius(SUN_BODY_ID, 'STAR');
 const DEFAULT_LIGHT_INTENSITY = 2;
 const ROTATION_SPEED = 0.001;
 

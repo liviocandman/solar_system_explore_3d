@@ -9,6 +9,7 @@ import { Sun } from './Sun';
 import { CelestialBody } from './CelestialBody';
 import type { EphemerisData } from '@/lib/types';
 import { getPlanetConfig } from '@/lib/textureConfig';
+import { getDidacticRadius, scalePositionFromKm } from '@/lib/scales';
 import { CameraController } from '@/hooks/useCameraAnimation';
 
 // --- Types ---
@@ -40,22 +41,22 @@ interface SceneContentProps {
 // --- Constants ---
 
 const CAMERA_CONFIG = {
-  position: [0, 50, 150] as [number, number, number],
+  position: [0, 200, 500] as [number, number, number], // Scaled initial position
   fov: 45,
   near: 0.1,
-  far: 50000,
+  far: 20000, // Optimized for 1 unit = 1M km
 };
 
 // Sun body ID (excluded from planet rendering)
 const SUN_BODY_ID = '10';
 
-
-function calculateDistanceFromOrigin(position: [number, number, number]): number {
+/**
+ * Calculates real distance from Sun in million km
+ * Since 1 unit = 1M km, this is just the magnitude of the position vector
+ */
+function calculateMillionKmFromSun(position: [number, number, number]): number {
   const [x, y, z] = position;
-  const sceneDistance = Math.sqrt(x * x + y * y + z * z);
-  // Convert scene units to AU (30 units = 1 AU), then to million km
-  const auDistance = sceneDistance / 30;
-  return auDistance * 149.6; // million km
+  return Math.sqrt(x * x + y * y + z * z);
 }
 
 // --- Inner Scene Component (uses quality context) ---
@@ -84,21 +85,22 @@ function SceneContent({
           return null;
         }
 
-        const position: [number, number, number] = [
+        // Scale real km position to scene units
+        const position = scalePositionFromKm(
           body.position.x,
           body.position.y,
-          body.position.z,
-        ];
+          body.position.z
+        );
 
         return {
           bodyId: body.bodyId,
           name: config.name,
           englishName: config.englishName,
           position,
-          radius: config.radius,
+          radius: getDidacticRadius(body.bodyId, config.bodyClass),
           texturePath: config.texturePath,
           rotationSpeed: config.rotationSpeed,
-          distanceFromSun: calculateDistanceFromOrigin(position),
+          distanceFromSun: calculateMillionKmFromSun(position),
         };
       })
       .filter(Boolean);
@@ -150,10 +152,10 @@ function SceneContent({
 
       {/* Stars background */}
       <Stars
-        radius={300}
-        depth={60}
+        radius={1000} // Expanded for larger scale
+        depth={300}
         count={tier === 'low' ? 2000 : 5000}
-        factor={4}
+        factor={10}
         fade
         speed={0.5}
       />
@@ -162,8 +164,8 @@ function SceneContent({
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
-        minDistance={10}
-        maxDistance={1500}
+        minDistance={1}
+        maxDistance={12000} // Neptune is at ~4500, extra room for viewing
         enablePan
         panSpeed={0.5}
         rotateSpeed={0.5}

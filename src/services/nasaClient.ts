@@ -45,8 +45,8 @@ export const BODY_NAMES: Record<string, string> = {
   '899': 'Neptune',
 };
 
-// Scale factor: 1 AU = 30 scene units (arbitrary scale for visualization)
-const AU_TO_SCENE_SCALE = 30;
+// Scale factor: 1 AU = 149,597,870.7 km
+const AU_TO_KM = 149_597_870.7;
 
 // Horizons API base URL
 const HORIZONS_API_URL = 'https://ssd.jpl.nasa.gov/api/horizons.api';
@@ -75,7 +75,15 @@ async function enforceRateLimit(): Promise<void> {
 
 /**
  * Parse XYZ vector coordinates from Horizons API response
- * The response contains a text table with position vectors
+ * The response contains a text table with position vectors in AU
+ * Returns positions in kilometers for consistent scale handling
+ * 
+ * VEC_TABLE='2' format example:
+ * $$SOE
+ *  2460318.500000000 = A.D. 2024-Jan-15 00:00:00.0000 TDB
+ *   X = 9.876543210987654E-01 Y = 2.345678901234567E-01 Z = 1.234567890123456E-04
+ *  ...
+ * $$EOE
  */
 function parseVectorFromResponse(result: string): { x: number; y: number; z: number } | null {
   // Look for the data section between $$SOE and $$EOE markers
@@ -95,26 +103,58 @@ function parseVectorFromResponse(result: string): { x: number; y: number; z: num
     return null;
   }
 
-  // Parse the vector line - format varies but typically: X, Y, Z in AU
-  // Example line: " 9.876543210987654E-01  2.345678901234567E-01  1.234567890123456E-04"
-  const dataLine = lines[0];
-  const values = dataLine.split(/\s+/).filter(Boolean);
+  // Find the line containing X =, Y =, Z = (position vector format)
+  const positionLine = lines.find(line =>
+    line.includes('X =') && line.includes('Y =') && line.includes('Z =')
+  );
 
-  // Find numeric values that look like scientific notation
-  const numbers = values
-    .map(v => parseFloat(v))
-    .filter(n => !isNaN(n));
+  if (!positionLine) {
+    // Fallback: try to find scientific notation values on the second line
+    // (first line is often the Julian date timestamp)
+    const candidateLine = lines.length > 1 ? lines[1] : lines[0];
+    const sciNotationPattern = /[-+]?\d+\.\d+E[+-]?\d+/gi;
+    const matches = candidateLine.match(sciNotationPattern);
 
-  if (numbers.length >= 3) {
-    return {
-      x: numbers[0] * AU_TO_SCENE_SCALE,
-      y: numbers[2] * AU_TO_SCENE_SCALE, // Z in astronomy -> Y in Three.js (up)
-      z: numbers[1] * AU_TO_SCENE_SCALE, // Y in astronomy -> Z in Three.js
-    };
+    if (matches && matches.length >= 3) {
+      const x = parseFloat(matches[0]);
+      const y = parseFloat(matches[1]);
+      const z = parseFloat(matches[2]);
+
+      console.log(`[NASA Client] Parsed position (fallback): X=${x}, Y=${y}, Z=${z} AU`);
+
+      return {
+        x: x * AU_TO_KM,
+        y: z * AU_TO_KM, // Z in astronomy -> Y in Three.js (up)
+        z: y * AU_TO_KM, // Y in astronomy -> Z in Three.js
+      };
+    }
+
+    console.error('[NASA Client] Could not find position vector line');
+    return null;
   }
 
-  console.error('[NASA Client] Could not parse vector values from:', dataLine);
-  return null;
+  // Parse "X = 1.234E-01 Y = 5.678E-02 Z = 9.012E-03" format
+  const xMatch = positionLine.match(/X\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+  const yMatch = positionLine.match(/Y\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+  const zMatch = positionLine.match(/Z\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+
+  if (!xMatch || !yMatch || !zMatch) {
+    console.error('[NASA Client] Could not parse X/Y/Z values from:', positionLine);
+    return null;
+  }
+
+  const xAU = parseFloat(xMatch[1]);
+  const yAU = parseFloat(yMatch[1]);
+  const zAU = parseFloat(zMatch[1]);
+
+  console.log(`[NASA Client] Parsed position: X=${xAU}, Y=${yAU}, Z=${zAU} AU`);
+
+  // Convert AU to km for consistent scale system (1 unit = 1M km)
+  return {
+    x: xAU * AU_TO_KM,
+    y: zAU * AU_TO_KM, // Z in astronomy -> Y in Three.js (up)
+    z: yAU * AU_TO_KM, // Y in astronomy -> Z in Three.js
+  };
 }
 
 // --- Main API Functions ---
