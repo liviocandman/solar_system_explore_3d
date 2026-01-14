@@ -6,6 +6,10 @@
 // Conversion factor: km to Three.js units
 export const KM_TO_UNIT = 1 / 1_000_000;
 
+// Conversion factor: AU to Three.js units (1 AU = 149.6 million km)
+export const AU_TO_UNIT = 149.59787;
+
+
 // Didactic visual multipliers
 // These inflat objects so they are visible while maintaining relative position accuracy
 export const DIDACTIC_SCALE = {

@@ -9,8 +9,9 @@ import { Sun } from './Sun';
 import { CelestialBody } from './CelestialBody';
 import type { EphemerisData } from '@/lib/types';
 import { getPlanetConfig } from '@/lib/textureConfig';
-import { getDidacticRadius, scalePositionFromKm } from '@/lib/scales';
+import { getDidacticRadius, scalePositionFromKm, AU_TO_UNIT } from '@/lib/scales';
 import { CameraController } from '@/hooks/useCameraAnimation';
+import { OrbitLine, getOrbitOpacity } from './OrbitLine';
 import * as THREE from 'three';
 
 // --- Types ---
@@ -198,6 +199,29 @@ function SceneContent({
 
       {/* Sun at center */}
       <Sun />
+
+      {/* Keplerian orbital path lines - ellipses with Sun at focus */}
+      {planetsToRender.map((planet) => {
+        if (!planet) return null;
+        const config = getPlanetConfig(planet.bodyId);
+        if (!config) return null;
+
+        // Calculate semi-major axis from meanDistanceAU (1 AU = 149.6 scene units)
+        const semiMajorAxis = config.meanDistanceAU * AU_TO_UNIT;
+
+        return (
+          <OrbitLine
+            key={`orbit-${planet.bodyId}`}
+            semiMajorAxis={semiMajorAxis}
+            eccentricity={config.eccentricity}
+            inclination={config.orbitalInclination}
+            longAscNode={config.longAscNode}
+            longPerihelion={config.longPerihelion}
+            opacity={getOrbitOpacity(planet.distanceFromSun)}
+            color="#4a90d9"
+          />
+        );
+      })}
 
       {/* Dynamically render all planets from ephemeris data */}
       {planetsToRender.map((planet) => {
