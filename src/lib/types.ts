@@ -13,6 +13,7 @@ export interface EphemerisData {
   bodyId: string;
   name: string;
   position: EphemerisPosition;
+  velocity?: EphemerisPosition; // km/s from NASA API
   timestamp: string;
 }
 

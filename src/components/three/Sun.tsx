@@ -5,6 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
 import type { Mesh } from 'three';
 import { getDidacticRadius } from '@/lib/scales';
+import { getTexturePath, TextureTier } from '@/lib/textureConfig';
+import { useQualityTier } from '@/contexts/QualityTierContext';
 
 // --- Types ---
 
@@ -15,11 +17,10 @@ interface SunProps {
 
 // --- Constants ---
 
-const SUN_TEXTURE_PATH = '/textures/sun.webp';
 const SUN_BODY_ID = '10';
 // Computed didactic radius: (696000 / 1000000) * 50 = 34.8
 const DEFAULT_RADIUS = getDidacticRadius(SUN_BODY_ID, 'STAR');
-const DEFAULT_LIGHT_INTENSITY = 2;
+const DEFAULT_LIGHT_INTENSITY = 3.5; // Intense point light for dramatic scene
 const ROTATION_SPEED = 0.001;
 
 // --- Component ---
@@ -29,7 +30,9 @@ export function Sun({
   lightIntensity = DEFAULT_LIGHT_INTENSITY,
 }: SunProps) {
   const meshRef = useRef<Mesh>(null);
-  const sunTexture = useTexture(SUN_TEXTURE_PATH);
+  const { tier } = useQualityTier();
+  const texturePath = getTexturePath(SUN_BODY_ID, tier as TextureTier);
+  const sunTexture = useTexture(texturePath);
 
   // Slow rotation animation
   useFrame(() => {
@@ -46,7 +49,7 @@ export function Sun({
         <meshStandardMaterial
           map={sunTexture}
           emissive="#ffaa00"
-          emissiveIntensity={1.5}
+          emissiveIntensity={3}
           emissiveMap={sunTexture}
         />
       </mesh>
@@ -56,17 +59,18 @@ export function Sun({
         position={[0, 0, 0]}
         intensity={lightIntensity}
         color="#ffffff"
-        distance={0}
-        decay={0.5}
+        distance={20000}
+        decay={0}
+        castShadow
       />
 
       {/* Ambient glow effect (simple halo) */}
       <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[radius * 1.2, 32, 32]} />
+        <sphereGeometry args={[radius * 1.2, 64, 64]} />
         <meshBasicMaterial
           color="#ffcc66"
           transparent
-          opacity={0.15}
+          opacity={0.001}
           depthWrite={false}
         />
       </mesh>

@@ -11,10 +11,10 @@ export const AU_TO_UNIT = 149.59787;
 
 
 // Didactic visual multipliers
-// These inflat objects so they are visible while maintaining relative position accuracy
+// These inflate objects so they are visible while maintaining relative position accuracy
 export const DIDACTIC_SCALE = {
   SUN: 50,
-  GAS_GIANT: 1000,
+  GAS_GIANT: 400,
   ROCKY_PLANET: 2000,
   MOON: 3000,
 };

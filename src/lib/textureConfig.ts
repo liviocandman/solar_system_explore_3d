@@ -6,13 +6,21 @@ import { BodyClass } from './scales';
 
 // --- Types ---
 
+export type TextureTier = 'low' | 'mid' | 'high';
+
+export interface TexturePaths {
+  low: string;
+  mid: string;
+  high: string;
+}
+
 export interface PlanetConfig {
   bodyId: string;
   name: string;
   englishName: string;
   type: 'STAR' | 'PLANET' | 'DWARF_PLANET';
   bodyClass: BodyClass;
-  texturePath: string;
+  texturePaths: TexturePaths; // Tiered texture paths for adaptive loading
   fallbackColor: string;
   radius: number; // Scene units (will be computed dynamically if needed)
   rotationSpeed: number; // Radians per frame
@@ -22,9 +30,20 @@ export interface PlanetConfig {
   eccentricity: number; // Orbital eccentricity (e) - 0=circle, closer to 1=more elliptical
   longAscNode: number; // Longitude of ascending node in degrees (Ω)
   longPerihelion: number; // Longitude of perihelion in degrees (ϖ)
+  // Physical Properties
+  surfaceGravity: number; // m/s² (Earth = 9.81)
+  dayLength: number; // Hours for one rotation
+  meanTemperature: number; // Celsius (average)
 }
 
-
+// Helper to generate tiered texture paths
+function getTexturePaths(name: string): TexturePaths {
+  return {
+    low: `/textures/${name}_low.webp`,
+    mid: `/textures/${name}_mid.webp`,
+    high: `/textures/${name}_high.webp`,
+  };
+}
 
 // --- Texture Map ---
 // Initial radius values are placeholders, they should be derived from src/lib/scales.ts in the components
@@ -36,16 +55,19 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Sun',
     type: 'STAR',
     bodyClass: 'STAR',
-    texturePath: '/textures/sun.webp',
+    texturePaths: getTexturePaths('sun'),
     fallbackColor: '#FDB813',
-    radius: 34.8, // Didactic radius
+    radius: 34.8,
     rotationSpeed: 0.001,
     orbitalPeriod: 0,
     meanDistanceAU: 0,
-    orbitalInclination: 0, // Sun is at center, no orbit
+    orbitalInclination: 0,
     eccentricity: 0,
     longAscNode: 0,
     longPerihelion: 0,
+    surfaceGravity: 274,
+    dayLength: 609.12,
+    meanTemperature: 5500,
   },
   '199': {
     bodyId: '199',
@@ -53,16 +75,19 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Mercury',
     type: 'PLANET',
     bodyClass: 'ROCKY_PLANET',
-    texturePath: '/textures/mercury.webp',
+    texturePaths: getTexturePaths('mercury'),
     fallbackColor: '#8C7853',
     radius: 4.8,
     rotationSpeed: 0.001,
     orbitalPeriod: 88,
     meanDistanceAU: 0.387,
-    orbitalInclination: 7.0, // Mercury has highest inclination
+    orbitalInclination: 7.0,
     eccentricity: 0.2056,
     longAscNode: 48.33,
     longPerihelion: 77.45,
+    surfaceGravity: 3.7,
+    dayLength: 4222.6,
+    meanTemperature: 167,
   },
   '299': {
     bodyId: '299',
@@ -70,7 +95,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Venus',
     type: 'PLANET',
     bodyClass: 'ROCKY_PLANET',
-    texturePath: '/textures/venus.webp',
+    texturePaths: getTexturePaths('venus'),
     fallbackColor: '#FFC649',
     radius: 12.1,
     rotationSpeed: 0.0005,
@@ -80,6 +105,9 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0068,
     longAscNode: 76.68,
     longPerihelion: 131.53,
+    surfaceGravity: 8.87,
+    dayLength: 2802,
+    meanTemperature: 464,
   },
   '399': {
     bodyId: '399',
@@ -87,16 +115,19 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Earth',
     type: 'PLANET',
     bodyClass: 'ROCKY_PLANET',
-    texturePath: '/textures/earth.webp',
+    texturePaths: getTexturePaths('earth'),
     fallbackColor: '#6B93D6',
     radius: 12.7,
     rotationSpeed: 0.002,
     orbitalPeriod: 365,
     meanDistanceAU: 1.0,
-    orbitalInclination: 0.0, // Earth defines the ecliptic plane
+    orbitalInclination: 0.0,
     eccentricity: 0.0167,
-    longAscNode: 0.0, // Reference point
+    longAscNode: 0.0,
     longPerihelion: 102.94,
+    surfaceGravity: 9.81,
+    dayLength: 24,
+    meanTemperature: 15,
   },
   '499': {
     bodyId: '499',
@@ -104,7 +135,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Mars',
     type: 'PLANET',
     bodyClass: 'ROCKY_PLANET',
-    texturePath: '/textures/mars.webp',
+    texturePaths: getTexturePaths('mars'),
     fallbackColor: '#C1440E',
     radius: 6.7,
     rotationSpeed: 0.0019,
@@ -114,6 +145,9 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0934,
     longAscNode: 49.58,
     longPerihelion: 336.04,
+    surfaceGravity: 3.71,
+    dayLength: 24.6,
+    meanTemperature: -65,
   },
   '599': {
     bodyId: '599',
@@ -121,7 +155,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Jupiter',
     type: 'PLANET',
     bodyClass: 'GAS_GIANT',
-    texturePath: '/textures/jupiter.webp',
+    texturePaths: getTexturePaths('jupiter'),
     fallbackColor: '#D8CA9D',
     radius: 71.4,
     rotationSpeed: 0.004,
@@ -131,6 +165,9 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0489,
     longAscNode: 100.46,
     longPerihelion: 14.75,
+    surfaceGravity: 24.79,
+    dayLength: 9.9,
+    meanTemperature: -110,
   },
   '699': {
     bodyId: '699',
@@ -138,7 +175,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Saturn',
     type: 'PLANET',
     bodyClass: 'GAS_GIANT',
-    texturePath: '/textures/saturn.webp',
+    texturePaths: getTexturePaths('saturn'),
     fallbackColor: '#EAD6B8',
     radius: 60.2,
     rotationSpeed: 0.0038,
@@ -148,6 +185,9 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0565,
     longAscNode: 113.66,
     longPerihelion: 92.43,
+    surfaceGravity: 10.44,
+    dayLength: 10.7,
+    meanTemperature: -140,
   },
   '799': {
     bodyId: '799',
@@ -155,7 +195,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Uranus',
     type: 'PLANET',
     bodyClass: 'GAS_GIANT',
-    texturePath: '/textures/uranus.webp',
+    texturePaths: getTexturePaths('uranus'),
     fallbackColor: '#D1E7E7',
     radius: 25.5,
     rotationSpeed: 0.003,
@@ -165,6 +205,9 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0457,
     longAscNode: 74.01,
     longPerihelion: 170.96,
+    surfaceGravity: 8.87,
+    dayLength: 17.2,
+    meanTemperature: -195,
   },
   '899': {
     bodyId: '899',
@@ -172,7 +215,7 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     englishName: 'Neptune',
     type: 'PLANET',
     bodyClass: 'GAS_GIANT',
-    texturePath: '/textures/neptune.webp',
+    texturePaths: getTexturePaths('neptune'),
     fallbackColor: '#5B5DDF',
     radius: 24.7,
     rotationSpeed: 0.0032,
@@ -182,21 +225,24 @@ export const PLANET_CONFIG: Record<string, PlanetConfig> = {
     eccentricity: 0.0113,
     longAscNode: 131.78,
     longPerihelion: 44.97,
+    surfaceGravity: 11.15,
+    dayLength: 16.1,
+    meanTemperature: -200,
   },
 };
 
 // --- Helper Functions ---
 
 /**
- * Get texture path for a body
+ * Get texture path for a body based on quality tier
  */
-export function getTexturePath(bodyId: string): string {
+export function getTexturePath(bodyId: string, tier: TextureTier = 'mid'): string {
   const config = PLANET_CONFIG[bodyId];
   if (!config) {
     console.warn(`[textureConfig] No config found for bodyId: ${bodyId}`);
     return '';
   }
-  return config.texturePath;
+  return config.texturePaths[tier];
 }
 
 /**

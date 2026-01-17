@@ -35,7 +35,7 @@ interface UseCameraAnimationReturn {
 // --- Constants ---
 
 const DEFAULT_DURATION = 1.5; // seconds
-const DEFAULT_OFFSET_DISTANCE = 30; // units from target
+const DEFAULT_OFFSET_DISTANCE = 80; // units from target (increased to avoid zooming inside planets)
 const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 50, 150);
 const DEFAULT_LOOK_AT = new THREE.Vector3(0, 0, 0);
 
@@ -53,11 +53,12 @@ export function useCameraAnimation(
     offsetDistance = DEFAULT_OFFSET_DISTANCE,
   } = options;
 
-  const { camera } = useThree();
+  const { camera, controls } = useThree();
 
   const isAnimatingRef = useRef(false);
   const animationProgressRef = useRef(0);
   const startPositionRef = useRef(new THREE.Vector3());
+  const startLookAtRef = useRef(new THREE.Vector3(0, 0, 0)); // Track starting lookAt
   const targetRef = useRef<CameraTarget | null>(null);
 
   // Animation frame loop
@@ -82,31 +83,54 @@ export function useCameraAnimation(
       t
     );
 
-    // Look at target
-    camera.lookAt(targetRef.current.lookAt);
+    // Interpolate the lookAt target (from Sun to planet)
+    const currentLookAt = new THREE.Vector3().lerpVectors(
+      startLookAtRef.current,
+      targetRef.current.lookAt,
+      t
+    );
+
+    // Update OrbitControls target (this is the key fix!)
+    if (controls && 'target' in controls) {
+      (controls.target as THREE.Vector3).copy(currentLookAt);
+      (controls as unknown as { update: () => void }).update();
+    }
+
+    camera.lookAt(currentLookAt);
   });
 
   const focusOn = (targetPosition: { x: number; y: number; z: number }) => {
     const target = new THREE.Vector3(targetPosition.x, targetPosition.y, targetPosition.z);
 
-    // Calculate camera position offset from target
-    // Position camera at an angle above and behind the target
-    const directionToSun = target.clone().normalize().negate();
-    const offset = directionToSun.multiplyScalar(offsetDistance);
-    offset.y += offsetDistance * 0.5; // Slightly above
+    // Calculate camera position: place camera at a distance from the planet
+    // looking at the planet from the current camera direction
+    const currentCameraDir = camera.position.clone().normalize();
+
+    // Position camera offset from the target planet
+    // Camera will be placed "behind" where it currently is relative to origin
+    const offset = currentCameraDir.multiplyScalar(offsetDistance);
+    offset.y = Math.max(offset.y, offsetDistance * 0.3); // Ensure some height above
 
     const cameraTargetPosition = target.clone().add(offset);
 
     // Store animation state
     startPositionRef.current.copy(camera.position);
+
+    // Capture current lookAt target (from OrbitControls or default origin)
+    if (controls && 'target' in controls) {
+      startLookAtRef.current.copy(controls.target as THREE.Vector3);
+    } else {
+      startLookAtRef.current.set(0, 0, 0);
+    }
+
     targetRef.current = {
       position: cameraTargetPosition,
-      lookAt: target,
+      lookAt: target, // Camera looks AT the planet, not the Sun
     };
     animationProgressRef.current = 0;
     isAnimatingRef.current = true;
 
-    console.log(`[CameraAnimation] Focusing on position:`, targetPosition);
+    console.log(`[CameraAnimation] Focusing on:`, targetPosition, 'Camera to:', cameraTargetPosition);
   };
 
   const resetCamera = () => {

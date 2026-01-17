@@ -3,12 +3,13 @@
 import { Suspense, ReactNode, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { QualityTierProvider, useQualityTier } from '@/contexts/QualityTierContext';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Sun } from './Sun';
 import { CelestialBody } from './CelestialBody';
 import type { EphemerisData } from '@/lib/types';
-import { getPlanetConfig } from '@/lib/textureConfig';
+import { getPlanetConfig, getTexturePath, TextureTier } from '@/lib/textureConfig';
 import { getDidacticRadius, scalePositionFromKm, AU_TO_UNIT } from '@/lib/scales';
 import { CameraController } from '@/hooks/useCameraAnimation';
 import { OrbitLine, getOrbitOpacity } from './OrbitLine';
@@ -21,6 +22,7 @@ export interface SelectedPlanet {
   name: string;
   englishName: string;
   position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number }; // km/s from NASA API
   distanceFromSun: number;
 }
 
@@ -123,8 +125,9 @@ function SceneContent({
           name: config.name,
           englishName: config.englishName,
           position,
+          velocity: body.velocity, // km/s from NASA API
           radius: getDidacticRadius(body.bodyId, config.bodyClass),
-          texturePath: config.texturePath,
+          texturePath: getTexturePath(body.bodyId, tier as TextureTier), // Tier-based texture selection
           rotationSpeed: config.rotationSpeed,
           distanceFromSun: calculateMillionKmFromSun(position),
         };
@@ -132,12 +135,12 @@ function SceneContent({
       .filter(Boolean);
   })();
 
-  // Handle planet click - create SelectedPlanet and call callback
-  const handlePlanetClick = (name: string) => {
+  // Handle planet click - lookup by bodyId for reliable matching
+  const handlePlanetClick = (bodyId: string) => {
     if (!onPlanetClick) return;
 
-    // Find the planet by name
-    const planet = planetsToRender.find(p => p?.name === name);
+    // Find the planet by bodyId (more reliable than name)
+    const planet = planetsToRender.find(p => p?.bodyId === bodyId);
 
     if (planet) {
       const selected: SelectedPlanet = {
@@ -149,8 +152,10 @@ function SceneContent({
           y: planet.position[1],
           z: planet.position[2],
         },
+        velocity: planet.velocity, // km/s from NASA API
         distanceFromSun: planet.distanceFromSun,
       };
+      console.log('[SceneManager] Planet clicked:', selected.englishName, selected.position, selected.velocity);
       onPlanetClick(selected);
     }
   };
@@ -173,7 +178,17 @@ function SceneContent({
         }
       }}
     >
-      <ambientLight intensity={0.15} />
+      <ambientLight intensity={0.25} color="#b0b0b0" />
+
+      {/* Bloom postprocessing for Sun glow effect */}
+      <EffectComposer>
+        <Bloom
+          intensity={1.5}
+          luminanceThreshold={0.6}
+          luminanceSmoothing={0.9}
+          mipmapBlur
+        />
+      </EffectComposer>
 
       {/* Stars background */}
       <Stars
@@ -185,16 +200,18 @@ function SceneContent({
         speed={0.5}
       />
 
-      {/* Orbit controls for navigation */}
+      {/* Orbit controls for navigation - target changes when planet is selected */}
       <OrbitControls
+        makeDefault
         enableDamping
         dampingFactor={0.05}
         minDistance={1}
         maxDistance={12000}
         enablePan
-        panSpeed={0.5}
-        rotateSpeed={0.5}
-        zoomSpeed={0.8}
+        panSpeed={0.9}
+        rotateSpeed={0.9}
+        zoomSpeed={2.5}
+        target={selectedPlanetPosition ? [selectedPlanetPosition.x, selectedPlanetPosition.y, selectedPlanetPosition.z] : [0, 0, 0]}
       />
 
       {/* Sun at center */}
@@ -218,7 +235,7 @@ function SceneContent({
             longAscNode={config.longAscNode}
             longPerihelion={config.longPerihelion}
             opacity={getOrbitOpacity(planet.distanceFromSun)}
-            color="#4a90d9"
+            color="#a3cffe"
           />
         );
       })}
@@ -229,7 +246,9 @@ function SceneContent({
         return (
           <CelestialBody
             key={planet.bodyId}
+            bodyId={planet.bodyId}
             name={planet.name}
+            englishName={planet.englishName}
             position={planet.position}
             radius={planet.radius}
             textureUrl={planet.texturePath}

@@ -1,6 +1,7 @@
 'use client';
 
 import { PLANET_CONFIG } from '@/lib/textureConfig';
+import { REAL_RADII_KM } from '@/lib/scales';
 
 // --- Types ---
 
@@ -8,6 +9,7 @@ interface PlanetData {
   bodyId: string;
   englishName: string;
   position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number }; // km/s from NASA API
   distanceFromSun: number; // million km
 }
 
@@ -18,10 +20,6 @@ interface PlanetInfoProps {
 
 // --- Helper Functions ---
 
-/**
- * Calculates distance between two points
- * Since 1 unit = 1M km, the magnitude of the diff vector is millions of km
- */
 function calculateMillionKmDistance(
   pos1: { x: number; y: number; z: number },
   pos2: { x: number; y: number; z: number }
@@ -33,10 +31,28 @@ function calculateMillionKmDistance(
 }
 
 function formatNumber(num: number, decimals = 1): string {
-  if (num >= 1000) {
+  if (Math.abs(num) >= 1000) {
     return num.toLocaleString('en-US', { maximumFractionDigits: decimals });
   }
   return num.toFixed(decimals);
+}
+
+function formatDayLength(hours: number): string {
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remainingHours = Math.round(hours % 24);
+    if (remainingHours > 0) {
+      return `${days}d ${remainingHours}h`;
+    }
+    return `${days} days`;
+  }
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function calculateVelocityMagnitude(velocity: { x: number; y: number; z: number }): number {
+  return Math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2);
 }
 
 // --- Planet Type Icons ---
@@ -52,8 +68,8 @@ const PLANET_ICONS: Record<string, string> = {
 export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
   if (!planet) {
     return (
-      <div className="text-center py-8 px-4 text-white/50 animate-in fade-in duration-700">{/* emptyStateStyle */}
-        <div className="text-5xl mb-4 opacity-50">🌍</div>{/* emptyIconStyle */}
+      <div className="text-center py-8 px-4 text-white/50 animate-in fade-in duration-700">
+        <div className="text-5xl mb-4 opacity-50">🌍</div>
         <p>Select a planet to view details</p>
       </div>
     );
@@ -62,15 +78,27 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
   const config = PLANET_CONFIG[planet.bodyId];
   const planetType = config?.type || 'PLANET';
   const orbitalPeriod = config?.orbitalPeriod || 0;
+  const realRadiusKm = REAL_RADII_KM[planet.bodyId] || 0;
+  const diameterKm = realRadiusKm * 2;
 
-  // Calculate orbital velocity (km/s) using v = 2πr/T
-  const orbitalRadius = planet.distanceFromSun * 1e6;
-  const orbitalPeriodSeconds = orbitalPeriod * 24 * 60 * 60;
-  const orbitalVelocity = orbitalPeriodSeconds > 0
-    ? (2 * Math.PI * orbitalRadius) / orbitalPeriodSeconds
-    : 0;
+  // Calculate orbital velocity from NASA API velocity vector
+  const orbitalVelocity = planet.velocity
+    ? calculateVelocityMagnitude(planet.velocity)
+    : null;
 
-  // Calculate distance from Earth in million km
+  // Fallback: calculate using v = 2πr/T if no API velocity
+  const fallbackVelocity = (() => {
+    if (orbitalVelocity !== null) return null;
+    const orbitalRadius = planet.distanceFromSun * 1e6;
+    const orbitalPeriodSeconds = orbitalPeriod * 24 * 60 * 60;
+    return orbitalPeriodSeconds > 0
+      ? (2 * Math.PI * orbitalRadius) / orbitalPeriodSeconds
+      : null;
+  })();
+
+  const displayVelocity = orbitalVelocity ?? fallbackVelocity;
+
+  // Calculate distance from Earth
   const distanceFromEarth = earthPosition
     ? calculateMillionKmDistance(planet.position, earthPosition)
     : null;
@@ -78,13 +106,15 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
   const planetIcon = PLANET_ICONS[planetType] || '🪐';
   const fallbackColor = config?.fallbackColor || '#666';
 
+  // Gravity relative to Earth
+  const gravityG = config ? (config.surfaceGravity / 9.81).toFixed(2) : null;
+
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">{/* containerStyle */}
+    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-2">{/* headerStyle */}
+      <div className="flex items-center gap-3 mb-2">
         <div
           className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
-          /* planetIconStyle */
           style={{
             background: `radial-gradient(circle at 30% 30%, ${fallbackColor}aa, ${fallbackColor})`,
             boxShadow: `0 0 20px ${fallbackColor}40`,
@@ -93,17 +123,17 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
           {planetIcon}
         </div>
         <div className="flex flex-col">
-          <h2 className="text-2xl font-semibold text-white m-0">{/* planetNameStyle */}
+          <h2 className="text-2xl font-semibold text-white m-0">
             {planet.englishName}
           </h2>
-          <span className="text-sm text-white/50 uppercase tracking-widest">{/* planetTypeStyle */}
+          <span className="text-sm text-white/50 uppercase tracking-widest">
             {planetType.replace('_', ' ')}
           </span>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3">{/* statsGridStyle */}
+      {/* Stats Grid - Original 2x2 layout */}
+      <div className="grid grid-cols-2 gap-3">
         {/* Distance from Sun */}
         <StatCard
           label="Distance from Sun"
@@ -121,7 +151,7 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
         {/* Orbital Velocity */}
         <StatCard
           label="Orbital Velocity"
-          value={orbitalVelocity > 0 ? formatNumber(orbitalVelocity) : '—'}
+          value={displayVelocity !== null ? formatNumber(displayVelocity) : '—'}
           unit="km/s"
         />
 
@@ -132,6 +162,82 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
           unit="days"
         />
       </div>
+
+      {/* Physical Properties Section */}
+      {config && (
+        <>
+          <h3 className="text-xs text-white/40 uppercase tracking-widest font-semibold mt-2">
+            🌍 Physical Properties
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Surface Gravity */}
+            <StatCard
+              label="Surface Gravity"
+              value={`${config.surfaceGravity.toFixed(2)}`}
+              unit={`m/s² (${gravityG}g)`}
+            />
+
+            {/* Day Length */}
+            <StatCard
+              label="Day Length"
+              value={formatDayLength(config.dayLength)}
+              unit=""
+            />
+
+            {/* Mean Temperature */}
+            <StatCard
+              label="Temperature"
+              value={`${config.meanTemperature > 0 ? '+' : ''}${config.meanTemperature}`}
+              unit="°C"
+            />
+
+            {/* Diameter */}
+            <StatCard
+              label="Diameter"
+              value={formatNumber(diameterKm, 0)}
+              unit="km"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Orbital Data Section */}
+      {config && (
+        <>
+          <h3 className="text-xs text-white/40 uppercase tracking-widest font-semibold mt-2">
+            🛸 Orbital Data
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Semi-Major Axis */}
+            <StatCard
+              label="Semi-Major Axis"
+              value={formatNumber(config.meanDistanceAU, 3)}
+              unit="AU"
+            />
+
+            {/* Eccentricity */}
+            <StatCard
+              label="Eccentricity"
+              value={config.eccentricity.toFixed(4)}
+              unit=""
+            />
+
+            {/* Inclination */}
+            <StatCard
+              label="Inclination"
+              value={`${config.orbitalInclination.toFixed(2)}°`}
+              unit=""
+            />
+
+            {/* Body Type */}
+            <StatCard
+              label="Body Type"
+              value={config.bodyClass === 'GAS_GIANT' ? 'Gas Giant' : 'Rocky'}
+              unit=""
+            />
+          </div>
+        </>
+      )}
 
       {/* Footer Info */}
       <div className="p-3 bg-white/5 border border-white/5 rounded-lg">
@@ -145,17 +251,19 @@ export function PlanetInfo({ planet, earthPosition }: PlanetInfoProps) {
 
 function StatCard({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <div className="bg-white/5 rounded-lg p-3 border border-white/10 group transition-colors hover:bg-white/10 flex flex-col justify-between min-w-0">{/* statCardStyle */}
-      <div className="text-[10px] text-white/50 mb-1.5 uppercase tracking-wider group-hover:text-white/70 transition-colors leading-tight">{/* statLabelStyle */}
+    <div className="bg-white/5 rounded-lg p-3 border border-white/10 group transition-colors hover:bg-white/10 flex flex-col justify-between min-w-0">
+      <div className="text-[10px] text-white/50 mb-1.5 uppercase tracking-wider group-hover:text-white/70 transition-colors leading-tight">
         {label}
       </div>
       <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-        <span className="text-base font-semibold text-white truncate">{/* statValueStyle */}
+        <span className="text-base font-semibold text-white truncate">
           {value}
         </span>
-        <span className="text-[10px] text-white/50 uppercase tracking-tighter shrink-0">{/* statUnitStyle */}
-          {unit}
-        </span>
+        {unit && (
+          <span className="text-[10px] text-white/50 uppercase tracking-tighter shrink-0">
+            {unit}
+          </span>
+        )}
       </div>
     </div>
   );

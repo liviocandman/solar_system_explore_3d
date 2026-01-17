@@ -104,7 +104,7 @@ export function OrbitLine({
           <Line
             points={points}
             color={color}
-            lineWidth={1} // Constant pixel width regardless of zoom
+            lineWidth={3} // Constant pixel width regardless of zoom
             transparent
             opacity={opacity}
           />
@@ -123,8 +123,8 @@ export function OrbitLine({
  * @param distanceFromSun Distance in million km
  */
 export function getOrbitOpacity(distanceFromSun: number): number {
-  const minOpacity = 0.1;
-  const maxOpacity = 0.5;
+  const minOpacity = 0.04;
+  const maxOpacity = 0.02;
 
   // Logarithmic interpolation for smooth falloff
   const logMin = Math.log(50);   // ~Mercury

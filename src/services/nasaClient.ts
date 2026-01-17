@@ -10,6 +10,7 @@ export interface EphemerisData {
   bodyId: string;
   name: string;
   position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number }; // km/s
   timestamp: string;
 }
 
@@ -75,17 +76,24 @@ async function enforceRateLimit(): Promise<void> {
 
 /**
  * Parse XYZ vector coordinates from Horizons API response
- * The response contains a text table with position vectors in AU
- * Returns positions in kilometers for consistent scale handling
+ * The response contains a text table with position and velocity vectors
  * 
- * VEC_TABLE='2' format example:
+ * VEC_TABLE='3' format example:
  * $$SOE
  *  2460318.500000000 = A.D. 2024-Jan-15 00:00:00.0000 TDB
  *   X = 9.876543210987654E-01 Y = 2.345678901234567E-01 Z = 1.234567890123456E-04
- *  ...
+ *   VX= 1.234567890123456E-02 VY= 5.678901234567890E-02 VZ= 9.012345678901234E-04
  * $$EOE
  */
-function parseVectorFromResponse(result: string): { x: number; y: number; z: number } | null {
+interface ParsedVectors {
+  position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number };
+}
+
+// AU per day to km per second conversion
+const AU_PER_DAY_TO_KM_PER_SEC = AU_TO_KM / 86400;
+
+function parseVectorFromResponse(result: string): ParsedVectors | null {
   // Look for the data section between $$SOE and $$EOE markers
   const soeIndex = result.indexOf('$$SOE');
   const eoeIndex = result.indexOf('$$EOE');
@@ -108,32 +116,17 @@ function parseVectorFromResponse(result: string): { x: number; y: number; z: num
     line.includes('X =') && line.includes('Y =') && line.includes('Z =')
   );
 
+  // Find the line containing VX=, VY=, VZ= (velocity vector format)
+  const velocityLine = lines.find(line =>
+    line.includes('VX=') && line.includes('VY=') && line.includes('VZ=')
+  );
+
   if (!positionLine) {
-    // Fallback: try to find scientific notation values on the second line
-    // (first line is often the Julian date timestamp)
-    const candidateLine = lines.length > 1 ? lines[1] : lines[0];
-    const sciNotationPattern = /[-+]?\d+\.\d+E[+-]?\d+/gi;
-    const matches = candidateLine.match(sciNotationPattern);
-
-    if (matches && matches.length >= 3) {
-      const x = parseFloat(matches[0]);
-      const y = parseFloat(matches[1]);
-      const z = parseFloat(matches[2]);
-
-      console.log(`[NASA Client] Parsed position (fallback): X=${x}, Y=${y}, Z=${z} AU`);
-
-      return {
-        x: x * AU_TO_KM,
-        y: z * AU_TO_KM, // Z in astronomy -> Y in Three.js (up)
-        z: y * AU_TO_KM, // Y in astronomy -> Z in Three.js
-      };
-    }
-
     console.error('[NASA Client] Could not find position vector line');
     return null;
   }
 
-  // Parse "X = 1.234E-01 Y = 5.678E-02 Z = 9.012E-03" format
+  // Parse position "X = 1.234E-01 Y = 5.678E-02 Z = 9.012E-03" format
   const xMatch = positionLine.match(/X\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
   const yMatch = positionLine.match(/Y\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
   const zMatch = positionLine.match(/Z\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
@@ -147,14 +140,38 @@ function parseVectorFromResponse(result: string): { x: number; y: number; z: num
   const yAU = parseFloat(yMatch[1]);
   const zAU = parseFloat(zMatch[1]);
 
-  console.log(`[NASA Client] Parsed position: X=${xAU}, Y=${yAU}, Z=${zAU} AU`);
-
   // Convert AU to km for consistent scale system (1 unit = 1M km)
-  return {
+  const position = {
     x: xAU * AU_TO_KM,
     y: zAU * AU_TO_KM, // Z in astronomy -> Y in Three.js (up)
     z: yAU * AU_TO_KM, // Y in astronomy -> Z in Three.js
   };
+
+  // Parse velocity if available
+  let velocity: { x: number; y: number; z: number } | undefined;
+  if (velocityLine) {
+    const vxMatch = velocityLine.match(/VX\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+    const vyMatch = velocityLine.match(/VY\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+    const vzMatch = velocityLine.match(/VZ\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
+
+    if (vxMatch && vyMatch && vzMatch) {
+      const vxAU = parseFloat(vxMatch[1]);
+      const vyAU = parseFloat(vyMatch[1]);
+      const vzAU = parseFloat(vzMatch[1]);
+
+      // Convert AU/day to km/s and apply same coordinate swap
+      velocity = {
+        x: vxAU * AU_PER_DAY_TO_KM_PER_SEC,
+        y: vzAU * AU_PER_DAY_TO_KM_PER_SEC, // Z -> Y
+        z: vyAU * AU_PER_DAY_TO_KM_PER_SEC, // Y -> Z
+      };
+      console.log(`[NASA Client] Parsed velocity: VX=${velocity.x.toFixed(2)}, VY=${velocity.y.toFixed(2)}, VZ=${velocity.z.toFixed(2)} km/s`);
+    }
+  }
+
+  console.log(`[NASA Client] Parsed position: X=${xAU}, Y=${yAU}, Z=${zAU} AU`);
+
+  return { position, velocity };
 }
 
 // --- Main API Functions ---
@@ -183,7 +200,7 @@ export async function fetchBodyEphemeris(
     START_TIME: `'${targetDate}'`,
     STOP_TIME: `'${stopDate}'`,
     STEP_SIZE: "'1 d'",
-    VEC_TABLE: "'2'", // Position vectors only
+    VEC_TABLE: "'3'", // Position + Velocity vectors
     REF_PLANE: 'ECLIPTIC',
     REF_SYSTEM: 'ICRF',
     VEC_CORR: "'NONE'",
@@ -206,16 +223,17 @@ export async function fetchBodyEphemeris(
       return null;
     }
 
-    const position = parseVectorFromResponse(data.result);
+    const parsed = parseVectorFromResponse(data.result);
 
-    if (!position) {
+    if (!parsed) {
       return null;
     }
 
     return {
       bodyId,
       name: BODY_NAMES[bodyId] || `Body ${bodyId}`,
-      position,
+      position: parsed.position,
+      velocity: parsed.velocity,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {

@@ -10,6 +10,7 @@ interface SelectedPlanet {
   bodyId: string;
   englishName: string;
   position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number }; // km/s from NASA API
   distanceFromSun: number;
 }
 
