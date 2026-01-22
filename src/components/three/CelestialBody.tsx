@@ -1,11 +1,13 @@
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState } from 'react';
 import { useFrame, useThree, ThreeEvent } from '@react-three/fiber';
 import { useTexture, Text, Billboard } from '@react-three/drei';
 import type { Mesh } from 'three';
 import * as THREE from 'three';
 import '../../app/globals.css';
+import { PlanetMarker } from './PlanetMarker';
+import type { ViewMode } from '@/lib/scales';
 
 // --- Types ---
 
@@ -18,19 +20,21 @@ interface CelestialBodyProps {
   textureUrl: string;
   rotationSpeed?: number;
   onClick?: (bodyId: string) => void;
+  onDoubleClick?: (bodyId: string) => void;
+  viewMode?: ViewMode;
 }
 
 // --- Constants ---
 
 const DEFAULT_ROTATION_SPEED = 0.002;
 const LABEL_COLOR = '#a3cffe';
+const MIN_FONT_SIZE = 2;
+const MAX_FONT_SIZE = 100;
+const THROTTLE_FRAMES = 10;
 
-// Adaptive scaling constants
-const BASE_FONT_SIZE = 5; // Base font size in 3D units
-const MIN_FONT_SIZE = 2; // Smaller when close
-const MAX_FONT_SIZE = 100; // Much larger when zoomed out far
-const SCALE_BASE_DISTANCE = 100; // Lower base for faster growth
-const THROTTLE_FRAMES = 10; // Check every 10 frames
+// Marker fade constants
+const MARKER_FADE_START = 500;
+const MARKER_FADE_END = 100;
 
 // --- Component ---
 
@@ -43,71 +47,121 @@ export function CelestialBody({
   textureUrl,
   rotationSpeed = DEFAULT_ROTATION_SPEED,
   onClick,
+  onDoubleClick,
+  viewMode = 'didactic',
 }: CelestialBodyProps) {
   const meshRef = useRef<Mesh>(null);
   const texture = useTexture(textureUrl);
-  const [fontSize, setFontSize] = useState(BASE_FONT_SIZE);
+  const [fontSize, setFontSize] = useState(5);
+  const [markerOpacity, setMarkerOpacity] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const { camera } = useThree();
 
-  // Reuse Vector3 to avoid GC pressure
-  const tempVec = useMemo(() => new THREE.Vector3(), []);
+  const tempVec = useRef(new THREE.Vector3());
   const frameCountRef = useRef(0);
 
-  // Self-rotation animation + throttled font size calculation
+  // Animation loop
   useFrame(() => {
     // Planet rotation (every frame)
     if (meshRef.current) {
       meshRef.current.rotation.y += rotationSpeed;
     }
 
-    // Throttled font size check
+    // Throttled calculations
     frameCountRef.current++;
     if (frameCountRef.current % THROTTLE_FRAMES !== 0) return;
 
     // Calculate distance from camera to planet
-    tempVec.set(position[0], position[1], position[2]);
-    const distance = camera.position.distanceTo(tempVec);
+    tempVec.current.set(position[0], position[1], position[2]);
+    const distance = camera.position.distanceTo(tempVec.current);
 
-    // Linear scaling based on distance
-    // Close (distance < 100): very small labels to avoid overlap
-    // Medium (100-800): small to medium labels
-    // Far (800+): large labels for visibility at max zoom
+    // --- Adaptive Label Font Size ---
     let newFontSize: number;
-
     if (distance < 100) {
-      // Close up: tiny labels to avoid overlap
-      newFontSize = 0.5 + (distance / 100) * 1; // 0.5 to 1.5
+      newFontSize = 0.5 + (distance / 100) * 1;
     } else if (distance < 6000) {
-      // Medium range: gradual growth
-      newFontSize = 1.5 + ((distance - 100) / 700) * 6.5; // 1.5 to 8
+      newFontSize = 1.5 + ((distance - 100) / 700) * 6.5;
     } else {
-      // Far away: aggressive growth for visibility
-      newFontSize = 8 + Math.min(192, ((distance - 6000) / 4200) * 192); // 8 to 200
+      newFontSize = 8 + Math.min(192, ((distance - 6000) / 4200) * 192);
     }
-
     newFontSize = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, newFontSize));
-
-    // Only update if changed significantly
     if (Math.abs(newFontSize - fontSize) > 0.5) {
       setFontSize(newFontSize);
     }
+
+    // --- Marker Opacity (realistic mode only) ---
+    if (viewMode === 'realistic') {
+      // Hide marker when camera is close (absolute distance check)
+      // This ensures marker disappears when zoomed in on planets
+      if (distance < 1.0) {
+        if (markerOpacity !== 0) {
+          setMarkerOpacity(0);
+        }
+      } else {
+        // Calculate relative distance for fade
+        const relativeDistance = distance / radius;
+
+        let newOpacity: number;
+        if (relativeDistance > MARKER_FADE_START) {
+          newOpacity = 1;
+        } else if (relativeDistance < MARKER_FADE_END) {
+          newOpacity = 0;
+        } else {
+          newOpacity = (relativeDistance - MARKER_FADE_END) / (MARKER_FADE_START - MARKER_FADE_END);
+        }
+
+        if (Math.abs(newOpacity - markerOpacity) > 0.02) {
+          setMarkerOpacity(newOpacity);
+        }
+      }
+    } else if (markerOpacity > 0) {
+      setMarkerOpacity(0);
+    }
   });
 
-  // Click handler - emits bodyId for reliable lookup
+  // Click handler - show info only (no travel)
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    if (onClick) {
-      onClick(bodyId);
-    }
+    onClick?.(bodyId);
   };
+
+  // Double-click handler - travel to planet
+  const handleDoubleClick = (event: ThreeEvent<MouseEvent>) => {
+    event.stopPropagation();
+    onDoubleClick?.(bodyId);
+  };
+
+  // In realistic mode, planets are very small - use a minimum hitbox size for interaction
+  const hitboxRadius = viewMode === 'realistic'
+    ? Math.max(5, radius * 500) // At least 2 units, or 100x the tiny radius
+    : radius * 1.2; // Slightly larger than visual in didactic
+
+  // Ring size scales with radius
+  const ringInnerRadius = radius * 1.15;
+  const ringOuterRadius = radius * 1.25;
+
+  // Label color changes on hover
+  const labelColor = isHovered ? '#ffffff' : LABEL_COLOR;
+  // Label position: above planet when hovered, below otherwise
+  const labelYPosition = isHovered ? radius * 1.5 : -radius * 1.5;
+  const labelAnchorY = isHovered ? 'bottom' : 'top';
 
   return (
     <group position={position}>
-      {/* Planet mesh */}
+      {/* Invisible hitbox for interaction - always large enough to click */}
       <mesh
-        ref={meshRef}
+        visible={false}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onPointerEnter={() => setIsHovered(true)}
+        onPointerLeave={() => setIsHovered(false)}
       >
+        <sphereGeometry args={[hitboxRadius, 16, 16]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
+      {/* Visible planet mesh */}
+      <mesh ref={meshRef}>
         <sphereGeometry args={[radius, 64, 64]} />
         <meshStandardMaterial
           map={texture}
@@ -116,25 +170,36 @@ export function CelestialBody({
         />
       </mesh>
 
-      {/* 3D Text Label
-          - Naturally occluded by GPU depth buffer
-          - Billboard keeps text always facing the camera
-          - fontSize scales with camera distance (larger when zoomed out)
-      */}
-      <Billboard
-        follow={true}
-        lockX={false}
-        lockY={false}
-        lockZ={false}
-      >
+      {/* Hover Ring - white elliptical border around planet */}
+      {isHovered && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[ringInnerRadius, ringOuterRadius, 64]} />
+          <meshBasicMaterial
+            color="#ffffff"
+            transparent
+            opacity={0.9}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      )}
+
+      {/* LOD Marker - visible in realistic mode when far */}
+      {viewMode === 'realistic' && markerOpacity > 0 && (
+        <PlanetMarker opacity={markerOpacity} />
+      )}
+
+      {/* 3D Text Label - white and above planet on hover */}
+      <Billboard follow lockX={false} lockY={false} lockZ={false}>
         <Text
-          position={[0, -radius * 1.2, 0]}
+          position={[0, labelYPosition, 0]}
           fontSize={fontSize}
-          color={LABEL_COLOR}
+          color={labelColor}
           anchorX="center"
-          anchorY="top"
+          anchorY={labelAnchorY as 'top' | 'bottom'}
           outlineWidth={fontSize * 0.04}
           outlineColor="#000000"
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
         >
           {englishName.toUpperCase()}
         </Text>

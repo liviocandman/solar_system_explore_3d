@@ -1,79 +1,95 @@
 'use client';
 
 import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
-import type { Mesh } from 'three';
-import { getDidacticRadius } from '@/lib/scales';
+import * as THREE from 'three';
+import { getRadius, ViewMode } from '@/lib/scales';
 import { getTexturePath, TextureTier } from '@/lib/textureConfig';
 import { useQualityTier } from '@/contexts/QualityTierContext';
 
-// --- Types ---
-
 interface SunProps {
-  radius?: number;
   lightIntensity?: number;
+  viewMode?: ViewMode;
 }
 
-// --- Constants ---
-
 const SUN_BODY_ID = '10';
-// Computed didactic radius: (696000 / 1000000) * 50 = 34.8
-const DEFAULT_RADIUS = getDidacticRadius(SUN_BODY_ID, 'STAR');
-const DEFAULT_LIGHT_INTENSITY = 3.5; // Intense point light for dramatic scene
-const ROTATION_SPEED = 0.001;
-
-// --- Component ---
+const DEFAULT_LIGHT_INTENSITY = 2.5;
 
 export function Sun({
-  radius = DEFAULT_RADIUS,
   lightIntensity = DEFAULT_LIGHT_INTENSITY,
+  viewMode = 'didactic',
 }: SunProps) {
-  const meshRef = useRef<Mesh>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
   const { tier } = useQualityTier();
+  const camera = useThree((state) => state.camera); // Acesso à câmera para calcular distância
+
+  // Carregar Textura do Sol
   const texturePath = getTexturePath(SUN_BODY_ID, tier as TextureTier);
   const sunTexture = useTexture(texturePath);
 
-  // Slow rotation animation
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += ROTATION_SPEED;
+  // Tamanhos de referência
+  const didacticRadius = getRadius(SUN_BODY_ID, 'STAR', 'didactic'); // ~35u
+  const realisticRadius = getRadius(SUN_BODY_ID, 'STAR', 'realistic'); // ~0.7u
+
+  useFrame((state, delta) => {
+    if (!meshRef.current) return;
+
+    let targetScale;
+
+    if (viewMode === 'didactic') {
+      // MODO DIDÁTICO: Tamanho fixo e grande
+      targetScale = didacticRadius;
+    } else {
+      // MODO REALISTA (O Truque da Escala Dinâmica)
+
+      // 1. Calcular distância da câmera ao Sol (0,0,0)
+      const distance = camera.position.length();
+
+      // 2. Definir um fator de escala visual
+      // "distance / 120" significa: a cada 120 unidades de distância, o sol ganha 1 unidade de tamanho visual.
+      // Isso mantém ele visível como um disco pequeno no céu de Netuno.
+      const visualScale = distance / 500;
+
+      // 3. Clamp (Trava de segurança)
+      // Nunca deixe o sol ficar menor que o tamanho real (0.7)
+      // Nunca deixe ele ficar colossalmente grande a ponto de engolir a Terra se estivermos perto
+      targetScale = Math.max(realisticRadius, visualScale);
     }
+
+    // Animação suave (Lerp) para não "pular" de tamanho quando troca de modo
+    const currentScale = meshRef.current.scale.x;
+    const smoothScale = THREE.MathUtils.lerp(currentScale, targetScale, delta * 25);
+
+    meshRef.current.scale.setScalar(smoothScale);
+    meshRef.current.rotation.y += 0.0005;
   });
 
   return (
     <group>
-      {/* Sun mesh with emissive glow */}
-      <mesh ref={meshRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[radius, 64, 64]} />
-        <meshStandardMaterial
+      {/* SOL VISUAL (A esfera brilhante) 
+         Usamos meshBasicMaterial com cor > 1.0 para forçar o Bloom (Brilho Neon)
+         sem depender de luzes externas.
+      */}
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshBasicMaterial
           map={sunTexture}
-          emissive="#ffaa00"
-          emissiveIntensity={3}
-          emissiveMap={sunTexture}
+          color={[3, 2.4, 1.5]} // Multiplicador de HDR (Intensidade do brilho)
+          toneMapped={false}    // Importante: Permite cores "estouradas" para o Bloom
         />
       </mesh>
 
-      {/* Point light for scene illumination */}
+      {/* LUZ FÍSICA (Iluminação dos planetas)
+         Esta luz ilumina a Terra, Júpiter, etc.
+      */}
       <pointLight
         position={[0, 0, 0]}
         intensity={lightIntensity}
-        color="#ffffff"
-        distance={20000}
-        decay={0}
-        castShadow
+        distance={0} // Infinito
+        decay={0}    // Luz não enfraquece no vácuo
+        color="#fff0dd"
       />
-
-      {/* Ambient glow effect (simple halo) */}
-      <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[radius * 1.2, 64, 64]} />
-        <meshBasicMaterial
-          color="#ffcc66"
-          transparent
-          opacity={0.001}
-          depthWrite={false}
-        />
-      </mesh>
     </group>
   );
 }

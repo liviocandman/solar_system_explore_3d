@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PlanetInfo } from './PlanetInfo';
 import { DateSelector } from './DateSelector';
+import type { ViewMode } from '@/lib/scales';
 
 // --- Types ---
 
@@ -21,6 +22,8 @@ interface HUDProps {
   onDateChange: (date: string) => void;
   onRefresh?: () => void;
   isFallback?: boolean;
+  viewMode?: ViewMode;
+  onToggleViewMode?: () => void;
 }
 
 // --- Hook for responsive detection ---
@@ -68,6 +71,8 @@ export function HUD({
   onDateChange,
   onRefresh,
   isFallback = false,
+  viewMode = 'didactic',
+  onToggleViewMode,
 }: HUDProps) {
   const isMobile = useIsMobile();
   // Start expanded if planet is already selected, otherwise collapsed
@@ -140,16 +145,29 @@ export function HUD({
     <div className={`fixed top-4 right-4 bottom-4 w-80 glass-panel rounded-2xl z-[100] flex flex-col overflow-hidden transition-all duration-700 hardware-accel border-l-2 ${accentClass} ${selectedPlanet ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-90'}`}>
       {/* sidebarStyle */}
       {/* Header */}
-      <div className="p-6 pb-4 border-b border-white/10 flex items-center justify-between">{/* sidebarHeaderStyle */}
+      <div className="p-6 pb-4 border-b border-white/10 flex items-center justify-between">
         <h1 className="text-sm font-bold text-white/70 tracking-[0.15em] uppercase">
           Solar Explorer
         </h1>
-        {isFallback && (
-          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-[10px] font-bold text-yellow-500 uppercase">
-            <span>⚠️</span>
-            <span>Offline</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Scale Toggle Button */}
+          {onToggleViewMode && (
+            <button
+              onClick={onToggleViewMode}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-md text-[10px] font-bold text-blue-400 uppercase transition-colors"
+              title={viewMode === 'didactic' ? 'Switch to realistic scale' : 'Switch to didactic scale'}
+            >
+              <span>{viewMode === 'didactic' ? '📐' : '🔭'}</span>
+              <span>{viewMode === 'didactic' ? 'Didactic' : 'Realistic'}</span>
+            </button>
+          )}
+          {isFallback && (
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-[10px] font-bold text-yellow-500 uppercase">
+              <span>⚠️</span>
+              <span>Offline</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}

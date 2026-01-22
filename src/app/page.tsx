@@ -12,6 +12,7 @@ import { HUD } from '@/components/ui/HUD';
 import { BODY_IDS } from '@/lib/types';
 import type { AppError } from '@/components/ui/ErrorOverlay';
 import type { SelectedPlanet } from '@/components/three/SceneManager';
+import type { ViewMode } from '@/lib/scales';
 
 // Dynamically import SceneManager with SSR disabled
 // This prevents hydration mismatch errors with Three.js/R3F
@@ -66,6 +67,13 @@ export default function Home() {
 
   // Selected planet state for HUD
   const [selectedPlanet, setSelectedPlanet] = useState<SelectedPlanet | null>(null);
+
+  // View mode state: 'didactic' (inflated) or 'realistic' (true scale)
+  const [viewMode, setViewMode] = useState<ViewMode>('didactic');
+
+  // Travel target state - separate from selection (only set on double-click)
+  const [travelTarget, setTravelTarget] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [travelTargetRadius, setTravelTargetRadius] = useState<number | undefined>(undefined);
 
   // Get Earth position for distance calculations
   const earthPosition = useMemo(() => {
@@ -129,15 +137,24 @@ export default function Home() {
     console.log(`[Home] Ephemeris loaded - Source: ${source}, Bodies: ${ephemerisData.length}, Date: ${currentDate}`);
   }, [source, isLoading, ephemerisData.length, currentDate]);
 
-  // Handle planet selection
+  // Handle planet selection (single click) - show info only, no travel
   const handlePlanetClick = (planet: SelectedPlanet | null) => {
     setSelectedPlanet(planet);
 
     if (planet) {
-      console.log(`[Home] Planet selected: ${planet.englishName}`, planet);
+      console.log(`[Home] Planet selected: ${planet.englishName}`);
     } else {
       console.log('[Home] Planet deselected');
     }
+  };
+
+  // Handle planet double-click - switch to realistic + travel
+  const handlePlanetDoubleClick = (planet: SelectedPlanet) => {
+    setSelectedPlanet(planet);
+    setViewMode('realistic'); // Always switch to realistic on double-click
+    setTravelTarget(planet.position); // This triggers camera travel
+    setTravelTargetRadius(planet.radius); // For adaptive zoom distance
+    console.log(`[Home] Traveling to: ${planet.englishName}, radius: ${planet.radius}`);
   };
 
   // Show loading screen while loading
@@ -179,8 +196,11 @@ export default function Home() {
         <SceneManager
           ephemerisData={ephemerisData}
           onPlanetClick={handlePlanetClick}
+          onPlanetDoubleClick={handlePlanetDoubleClick}
           selectedPlanetId={selectedPlanet?.bodyId}
-          selectedPlanetPosition={selectedPlanet?.position}
+          travelTarget={travelTarget}
+          travelTargetRadius={travelTargetRadius}
+          viewMode={viewMode}
         />
       )}
 
@@ -193,6 +213,8 @@ export default function Home() {
           onDateChange={handleDateChange}
           onRefresh={refresh}
           isFallback={isFallback}
+          viewMode={viewMode}
+          onToggleViewMode={() => setViewMode(m => m === 'didactic' ? 'realistic' : 'didactic')}
         />
       )}
     </>

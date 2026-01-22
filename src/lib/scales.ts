@@ -74,3 +74,61 @@ export function scalePositionFromKm(x: number, y: number, z: number): [number, n
 export function unitToMillionKm(units: number): number {
   return units; // Since 1 unit = 1 million km
 }
+
+// --- View Mode System ---
+
+/**
+ * View mode determines how planets are scaled:
+ * - 'didactic': Planets are inflated (50-3000x) for visibility
+ * - 'realistic': Planets are true-to-scale (1:1 with distance)
+ */
+export type ViewMode = 'didactic' | 'realistic';
+
+/**
+ * Orbit visual settings per view mode
+ */
+export const ORBIT_CONFIG = {
+  didactic: {
+    opacity: 0.15,
+    lineWidth: 2,
+  },
+  realistic: {
+    opacity: 0.03,  // Very subtle
+    lineWidth: 1.5, // Thin line
+  },
+};
+
+/**
+ * Gets radius based on view mode
+ * @param bodyId - NASA body ID
+ * @param bodyClass - Type of celestial body
+ * @param mode - 'didactic' (inflated) or 'realistic' (true scale)
+ * @returns Radius in scene units
+ */
+export function getRadius(
+  bodyId: string,
+  bodyClass: BodyClass,
+  mode: ViewMode = 'didactic'
+): number {
+  const realRadiusKm = REAL_RADII_KM[bodyId] || 1000;
+  const realisticRadius = realRadiusKm * KM_TO_UNIT;
+
+  if (mode === 'realistic') {
+    return realisticRadius; // True scale (e.g., Earth = 0.00637 units, Sun = 0.696 units)
+  }
+
+  // Didactic mode - apply multipliers
+  switch (bodyClass) {
+    case 'STAR':
+      return realisticRadius * DIDACTIC_SCALE.SUN;
+    case 'GAS_GIANT':
+      return realisticRadius * DIDACTIC_SCALE.GAS_GIANT;
+    case 'ROCKY_PLANET':
+    case 'DWARF_PLANET':
+      return realisticRadius * DIDACTIC_SCALE.ROCKY_PLANET;
+    case 'MOON':
+      return realisticRadius * DIDACTIC_SCALE.MOON;
+    default:
+      return realisticRadius * DIDACTIC_SCALE.ROCKY_PLANET;
+  }
+}

@@ -27,7 +27,7 @@ interface UseCameraAnimationOptions {
 
 interface UseCameraAnimationReturn {
   /** Animate camera to look at a position */
-  focusOn: (targetPosition: { x: number; y: number; z: number }) => void;
+  focusOn: (targetPosition: { x: number; y: number; z: number }, radius?: number) => void;
   /** Reset camera to default position */
   resetCamera: () => void;
 }
@@ -99,17 +99,22 @@ export function useCameraAnimation(
     camera.lookAt(currentLookAt);
   });
 
-  const focusOn = (targetPosition: { x: number; y: number; z: number }) => {
+  const focusOn = (targetPosition: { x: number; y: number; z: number }, radius?: number) => {
     const target = new THREE.Vector3(targetPosition.x, targetPosition.y, targetPosition.z);
+
+    // Calculate offset distance based on planet radius
+    // Use 3x radius for nice framing, minimum 0.03 units for tiny rocky planets
+    const dynamicOffset = radius ? Math.max(0.03, radius * 3) : offsetDistance;
+
+    console.log(`[CameraAnimation] Received radius: ${radius}, calculated offset: ${dynamicOffset}`);
 
     // Calculate camera position: place camera at a distance from the planet
     // looking at the planet from the current camera direction
     const currentCameraDir = camera.position.clone().normalize();
 
     // Position camera offset from the target planet
-    // Camera will be placed "behind" where it currently is relative to origin
-    const offset = currentCameraDir.multiplyScalar(offsetDistance);
-    offset.y = Math.max(offset.y, offsetDistance * 0.3); // Ensure some height above
+    const offset = currentCameraDir.multiplyScalar(dynamicOffset);
+    offset.y = Math.max(offset.y, dynamicOffset * 0.3); // Ensure some height above
 
     const cameraTargetPosition = target.clone().add(offset);
 
@@ -130,7 +135,7 @@ export function useCameraAnimation(
     animationProgressRef.current = 0;
     isAnimatingRef.current = true;
 
-    console.log(`[CameraAnimation] Focusing on:`, targetPosition, 'Camera to:', cameraTargetPosition);
+    console.log(`[CameraAnimation] Focusing on:`, targetPosition, 'Camera will go to:', cameraTargetPosition.toArray());
   };
 
   const resetCamera = () => {
@@ -156,10 +161,12 @@ export function useCameraAnimation(
 
 interface CameraControllerProps {
   targetPosition?: { x: number; y: number; z: number } | null;
+  targetRadius?: number;
 }
 
 export function CameraController({
   targetPosition,
+  targetRadius,
 }: CameraControllerProps) {
   const { focusOn, resetCamera } = useCameraAnimation();
   const prevTargetRef = useRef<{ x: number; y: number; z: number } | null>(null);
@@ -172,13 +179,13 @@ export function CameraController({
 
     if (targetChanged) {
       if (targetPosition) {
-        focusOn(targetPosition);
+        focusOn(targetPosition, targetRadius);
       } else {
         resetCamera();
       }
       prevTargetRef.current = targetPosition ?? null;
     }
-  }, [targetPosition, focusOn, resetCamera]);
+  }, [targetPosition, targetRadius, focusOn, resetCamera]);
 
   return null; // This is a logic-only component
 }

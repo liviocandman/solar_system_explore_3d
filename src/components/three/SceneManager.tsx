@@ -10,7 +10,7 @@ import { Sun } from './Sun';
 import { CelestialBody } from './CelestialBody';
 import type { EphemerisData } from '@/lib/types';
 import { getPlanetConfig, getTexturePath, TextureTier } from '@/lib/textureConfig';
-import { getDidacticRadius, scalePositionFromKm, AU_TO_UNIT } from '@/lib/scales';
+import { getDidacticRadius, getRadius, scalePositionFromKm, AU_TO_UNIT, ViewMode } from '@/lib/scales';
 import { CameraController } from '@/hooks/useCameraAnimation';
 import { OrbitLine, getOrbitOpacity } from './OrbitLine';
 import * as THREE from 'three';
@@ -23,6 +23,7 @@ export interface SelectedPlanet {
   englishName: string;
   position: { x: number; y: number; z: number };
   velocity?: { x: number; y: number; z: number }; // km/s from NASA API
+  radius: number;
   distanceFromSun: number;
 }
 
@@ -30,16 +31,22 @@ interface SceneManagerProps {
   children?: ReactNode;
   ephemerisData?: EphemerisData[];
   onPlanetClick?: (planet: SelectedPlanet | null) => void;
+  onPlanetDoubleClick?: (planet: SelectedPlanet) => void;
   selectedPlanetId?: string | null;
-  selectedPlanetPosition?: { x: number; y: number; z: number } | null;
+  travelTarget?: { x: number; y: number; z: number } | null;
+  travelTargetRadius?: number;
+  viewMode?: ViewMode;
 }
 
 interface SceneContentProps {
   children?: ReactNode;
   ephemerisData?: EphemerisData[];
   onPlanetClick?: (planet: SelectedPlanet | null) => void;
+  onPlanetDoubleClick?: (planet: SelectedPlanet) => void;
   selectedPlanetId?: string | null;
-  selectedPlanetPosition?: { x: number; y: number; z: number } | null;
+  travelTarget?: { x: number; y: number; z: number } | null;
+  travelTargetRadius?: number;
+  viewMode?: ViewMode;
 }
 
 // --- Helper Components ---
@@ -75,10 +82,10 @@ function SelectionRing({ position, radius }: { position: [number, number, number
 // --- Constants ---
 
 const CAMERA_CONFIG = {
-  position: [0, 200, 500] as [number, number, number], // Scaled initial position
+  position: [0, 200, 500] as [number, number, number],
   fov: 45,
-  near: 0.1,
-  far: 20000,
+  near: 0.01, // Small enough for close-ups but not too small (prevents z-fighting)
+  far: 50000,
 };
 
 const SUN_BODY_ID = '10';
@@ -98,8 +105,11 @@ function SceneContent({
   children,
   ephemerisData,
   onPlanetClick,
+  onPlanetDoubleClick,
   selectedPlanetId,
-  selectedPlanetPosition
+  travelTarget,
+  travelTargetRadius,
+  viewMode = 'didactic'
 }: SceneContentProps) {
   const { settings, tier } = useQualityTier();
 
@@ -109,7 +119,7 @@ function SceneContent({
     }
 
     return ephemerisData
-      .filter(body => body.bodyId !== SUN_BODY_ID) // Exclude Sun (rendered separately)
+      .filter(body => body.bodyId !== SUN_BODY_ID)
       .map(body => {
         const config = getPlanetConfig(body.bodyId);
         if (!config) return null;
@@ -125,11 +135,12 @@ function SceneContent({
           name: config.name,
           englishName: config.englishName,
           position,
-          velocity: body.velocity, // km/s from NASA API
-          radius: getDidacticRadius(body.bodyId, config.bodyClass),
-          texturePath: getTexturePath(body.bodyId, tier as TextureTier), // Tier-based texture selection
+          velocity: body.velocity,
+          radius: getRadius(body.bodyId, config.bodyClass, viewMode),
+          texturePath: getTexturePath(body.bodyId, tier as TextureTier),
           rotationSpeed: config.rotationSpeed,
           distanceFromSun: calculateMillionKmFromSun(position),
+          bodyClass: config.bodyClass,
         };
       })
       .filter(Boolean);
@@ -153,10 +164,39 @@ function SceneContent({
           z: planet.position[2],
         },
         velocity: planet.velocity, // km/s from NASA API
+        radius: planet.radius,
         distanceFromSun: planet.distanceFromSun,
       };
-      console.log('[SceneManager] Planet clicked:', selected.englishName, selected.position, selected.velocity);
+      console.log('[SceneManager] Planet clicked:', selected.englishName);
       onPlanetClick(selected);
+    }
+  };
+
+  // Handle planet double-click - travel to planet
+  const handlePlanetDoubleClick = (bodyId: string) => {
+    if (!onPlanetDoubleClick) return;
+
+    const planet = planetsToRender.find(p => p?.bodyId === bodyId);
+
+    if (planet) {
+      // Always use realistic radius for camera zoom since we switch to realistic mode
+      const realisticRadius = getRadius(planet.bodyId, planet.bodyClass, 'realistic');
+
+      const selected: SelectedPlanet = {
+        bodyId: planet.bodyId,
+        name: planet.name,
+        englishName: planet.englishName,
+        position: {
+          x: planet.position[0],
+          y: planet.position[1],
+          z: planet.position[2],
+        },
+        velocity: planet.velocity,
+        radius: realisticRadius, // Use realistic radius for camera zoom
+        distanceFromSun: planet.distanceFromSun,
+      };
+      console.log('[SceneManager] Planet double-clicked:', selected.englishName, 'realistic radius:', realisticRadius);
+      onPlanetDoubleClick(selected);
     }
   };
 
@@ -183,16 +223,17 @@ function SceneContent({
       {/* Bloom postprocessing for Sun glow effect */}
       <EffectComposer>
         <Bloom
-          intensity={1.5}
+          intensity={2.5}
           luminanceThreshold={0.6}
           luminanceSmoothing={0.9}
           mipmapBlur
+          color="#ffffffff"
         />
       </EffectComposer>
 
       {/* Stars background */}
       <Stars
-        radius={1000} // Expanded for larger scale
+        radius={4000} // Expanded for larger scale
         depth={300}
         count={tier === 'low' ? 2000 : 5000}
         factor={10}
@@ -200,22 +241,21 @@ function SceneContent({
         speed={0.5}
       />
 
-      {/* Orbit controls for navigation - target changes when planet is selected */}
+      {/* Orbit controls for navigation */}
       <OrbitControls
         makeDefault
         enableDamping
         dampingFactor={0.05}
-        minDistance={1}
+        minDistance={0.001}
         maxDistance={12000}
         enablePan
-        panSpeed={0.9}
-        rotateSpeed={0.9}
-        zoomSpeed={2.5}
-        target={selectedPlanetPosition ? [selectedPlanetPosition.x, selectedPlanetPosition.y, selectedPlanetPosition.z] : [0, 0, 0]}
+        panSpeed={1}
+        rotateSpeed={1}
+        zoomSpeed={5}
       />
 
       {/* Sun at center */}
-      <Sun />
+      <Sun viewMode={viewMode} />
 
       {/* Keplerian orbital path lines - ellipses with Sun at focus */}
       {planetsToRender.map((planet) => {
@@ -236,6 +276,7 @@ function SceneContent({
             longPerihelion={config.longPerihelion}
             opacity={getOrbitOpacity(planet.distanceFromSun)}
             color="#a3cffe"
+            viewMode={viewMode}
           />
         );
       })}
@@ -254,6 +295,8 @@ function SceneContent({
             textureUrl={planet.texturePath}
             rotationSpeed={planet.rotationSpeed}
             onClick={handlePlanetClick}
+            onDoubleClick={handlePlanetDoubleClick}
+            viewMode={viewMode}
           />
         );
       })}
@@ -266,7 +309,7 @@ function SceneContent({
         />
       )}
 
-      <CameraController targetPosition={selectedPlanetPosition} />
+      <CameraController targetPosition={travelTarget} targetRadius={travelTargetRadius} />
 
       {/* Additional scene content */}
       {children}
@@ -280,8 +323,11 @@ export function SceneManager({
   children,
   ephemerisData,
   onPlanetClick,
+  onPlanetDoubleClick,
   selectedPlanetId,
-  selectedPlanetPosition
+  travelTarget,
+  travelTargetRadius,
+  viewMode = 'didactic'
 }: SceneManagerProps) {
   return (
     <QualityTierProvider>
@@ -292,8 +338,11 @@ export function SceneManager({
           <SceneContent
             ephemerisData={ephemerisData}
             onPlanetClick={onPlanetClick}
+            onPlanetDoubleClick={onPlanetDoubleClick}
             selectedPlanetId={selectedPlanetId}
-            selectedPlanetPosition={selectedPlanetPosition}
+            travelTarget={travelTarget}
+            travelTargetRadius={travelTargetRadius}
+            viewMode={viewMode}
           >
             {children}
           </SceneContent>
@@ -302,3 +351,5 @@ export function SceneManager({
     </QualityTierProvider>
   );
 }
+
+
